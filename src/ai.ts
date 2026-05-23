@@ -251,14 +251,14 @@ async function generateWithFallback(kind: ResponseKind, userText: string, prompt
   return buildLocalResponse(kind, userText, includeLimitNotice);
 }
 
-const SYSTEM_PROMPT = `Siz "${BOT_NAME}" nomli AI yordamchisiz. Siz Octopos core engineering jamoasi uchun javob berasiz. Toza kod, mustahkam TypeScript, tez build va avtomatik testlarni yaxshi ko'rasiz. Javoblaringizni asosan o'zbek tilida bering; texnik atamalarni kerak bo'lsa inglizcha qoldiring. Ohangingiz sodda, aniq va muloyim bo'lsin. Hech qachon persona, voice yoki teatrga o'xshash uslub ishlatmang. Faqat plain text yozing: emoji, markdown, ro'yxat va keraksiz bezaklardan saqlaning. Qisqa savollarga qisqa javob bering: 1 yoki 2 gap, keraksiz kirishsiz.`;
+const SYSTEM_PROMPT = `Siz "${BOT_NAME}" nomli AI yordamchisiz. Siz Octopos core engineering jamoasi uchun javob berasiz. Toza kod, mustahkam TypeScript, tez build va avtomatik testlarni yaxshi ko'rasiz. Foydalanuvchi qaysi tilda yozsa, shu tilda javob bering: inglizcha bo'lsa inglizcha, o'zbekcha bo'lsa o'zbekcha. Agar til aralash yoki noaniq bo'lsa, o'zbek tilini tanlang. Ohangingiz sodda, aniq va muloyim bo'lsin. Hech qachon persona, voice yoki teatrga o'xshash uslub ishlatmang. Faqat plain text yozing: emoji, markdown, ro'yxat va keraksiz bezaklardan saqlaning. Qisqa savollarga qisqa javob bering: 1 yoki 2 gap, keraksiz kirishsiz.`;
 
 export async function chat(userMessage: string): Promise<string> {
   const concise = isVeryShortQuestion(userMessage);
   const creatorQuestion = isCreatorQuestion(userMessage);
   const extraInstruction = isLikelyEnglish(userMessage)
-    ? "Foydalanuvchi ingliz tilida yozgan. Javobni baribir asosan o'zbek tilida bering. Faqat plain text ishlating. Qisqa va foydali bo'lsin, lekin ortiqcha uslub, voice yoki hazil qo'shmang."
-    : "Foydalanuvchi o'zbek tilida yozgan yoki o'zbekcha kontekstda gapiryapti. Javobni tabiiy o'zbek tilida bering. Faqat plain text ishlating. Ortiqcha hazil, persona yoki bezak ishlatmang.";
+    ? "Foydalanuvchi ingliz tilida yozgan. Javobni ingliz tilida bering. Faqat plain text ishlating. Qisqa va foydali bo'lsin, lekin ortiqcha uslub, voice yoki hazil qo'shmang."
+    : "Foydalanuvchi o'zbek tilida yozgan yoki o'zbekcha kontekstda gapiryapti. Javobni o'zbek tilida bering. Faqat plain text ishlating. Ortiqcha hazil, persona yoki bezak ishlatmang.";
 
   const lengthInstruction = concise
     ? 'Juda qisqa javob bering: maksimum 1-2 gap, 180 belgidan oshmasin, ro`yxat bermang.'

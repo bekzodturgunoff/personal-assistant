@@ -19,13 +19,19 @@ function getBot(): ReturnType<typeof createBot> {
 async function ensureCommands(bot: ReturnType<typeof createBot>): Promise<void> {
   if (commandsInitialized) return;
 
+  const commands = [
+    { command: 'start', description: 'Start OctoBot' },
+    { command: 'help', description: 'Show help' },
+    { command: 'roast', description: 'Roast replied code' },
+    { command: 'stop', description: 'Mute OctoBot in this chat' },
+    { command: 'resume', description: 'Re-enable OctoBot in this chat' },
+  ] as const;
+
   try {
-    await bot.api.setMyCommands([
-      { command: 'start', description: 'Start OctoBot' },
-      { command: 'help', description: 'Show help' },
-      { command: 'roast', description: 'Roast replied code' },
-      { command: 'stop', description: 'Mute OctoBot in this chat' },
-      { command: 'resume', description: 'Re-enable OctoBot in this chat' },
+    await Promise.all([
+      bot.api.setMyCommands(commands),
+      bot.api.setMyCommands(commands, { scope: { type: 'all_private_chats' } }),
+      bot.api.setMyCommands(commands, { scope: { type: 'all_group_chats' } }),
     ]);
     commandsInitialized = true;
   } catch (error) {
