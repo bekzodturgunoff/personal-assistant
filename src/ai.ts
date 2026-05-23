@@ -1,11 +1,11 @@
 import { GoogleGenAI } from '@google/genai';
-import crypto from 'crypto';
 import { config } from './config.js';
+import { getEnv } from './runtime-env.js';
 
 const ai = new GoogleGenAI({ apiKey: config.aiApiKey });
 
-const PRIMARY_MODEL = process.env.AI_MODEL || 'gemini-2.5-flash';
-const FALLBACK_MODEL = process.env.AI_FALLBACK_MODEL || 'gemini-1.5-flash';
+const PRIMARY_MODEL = getEnv('AI_MODEL') || 'gemini-2.5-flash';
+const FALLBACK_MODEL = getEnv('AI_FALLBACK_MODEL') || 'gemini-1.5-flash';
 const PRIMARY_COOLDOWN_MS = 10 * 60 * 1000;
 const LOCAL_MODE_COOLDOWN_MS = 10 * 60 * 1000;
 const LOCAL_NOTICE_REPEAT_MS = 5 * 60 * 1000;
@@ -97,8 +97,11 @@ export function isLocalJokeModeActive(): boolean {
 }
 
 function hashIndex(seed: string, length: number): number {
-  const digest = crypto.createHash('sha256').update(seed).digest();
-  return digest[0] % length;
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+  return hash % length;
 }
 
 function pickJoke(topic: keyof typeof CHAT_JOKES, seed: string): string {

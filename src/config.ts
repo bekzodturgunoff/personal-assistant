@@ -1,9 +1,7 @@
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { getEnv } from './runtime-env.js';
 
 function requireEnv(name: string): string {
-  const value = process.env[name];
+  const value = getEnv(name);
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
   }
@@ -11,11 +9,21 @@ function requireEnv(name: string): string {
 }
 
 export const config = {
-  telegramBotToken: requireEnv('TELEGRAM_BOT_TOKEN'),
-  aiApiKey: requireEnv('AI_API_KEY'),
+  get telegramBotToken() {
+    return requireEnv('TELEGRAM_BOT_TOKEN');
+  },
+  get aiApiKey() {
+    return requireEnv('AI_API_KEY');
+  },
   // telegramChatId is optional. If set, GitHub notifications go there.
   // Otherwise the bot will use subscribed chats discovered at runtime.
-  telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
-  port: parseInt(process.env.PORT || '3000', 10),
-  githubWebhookSecret: process.env.GITHUB_WEBHOOK_SECRET || '',
+  get telegramChatId() {
+    return getEnv('TELEGRAM_CHAT_ID') || '';
+  },
+  get port() {
+    return parseInt(getEnv('PORT') || '3000', 10);
+  },
+  get githubWebhookSecret() {
+    return getEnv('GITHUB_WEBHOOK_SECRET') || '';
+  },
 };

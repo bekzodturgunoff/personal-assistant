@@ -1,11 +1,15 @@
-import { Bot } from 'grammy';
+import { Bot } from 'grammy/web';
 import { config } from './config.js';
 import { setupTelegramHandlers } from './handlers/telegram.js';
 
-export const bot = new Bot(config.telegramBotToken);
+export function createBot() {
+  const bot = new Bot(config.telegramBotToken);
 
-setupTelegramHandlers(bot);
+  setupTelegramHandlers(bot);
 
-bot.catch((err) => {
-  console.error('Bot error:', err);
-});
+  bot.catch((err) => {
+    console.error('Bot error:', err);
+  });
+
+  return bot;
+}

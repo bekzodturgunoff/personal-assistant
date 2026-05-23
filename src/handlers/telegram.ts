@@ -67,12 +67,12 @@ export function setupTelegramHandlers(bot: Bot) {
       const chatId = chat.id as number;
 
       if (newStatus === 'member' || newStatus === 'administrator') {
-        addSubscriber(chatId);
+        await addSubscriber(chatId);
         await ctx.api.sendMessage(chatId, 'OctoBot bu chatga ulandi. Endi GitHub bildirishnomalari va kodli suhbatlar shu yerda ishlaydi. Meni tag qilib ko‘ring!', { link_preview_options: { is_disabled: true } });
       }
 
       if (newStatus === 'left' || newStatus === 'kicked') {
-        removeSubscriber(chatId);
+        await removeSubscriber(chatId);
       }
     } catch (err) {
       console.error('my_chat_member handler error:', err);

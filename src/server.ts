@@ -1,12 +1,17 @@
+import dotenv from 'dotenv';
 import express from 'express';
-import { webhookCallback } from 'grammy';
-import { bot } from './bot.js';
+import { webhookCallback } from 'grammy/web';
+import { createBot } from './bot.js';
 import { config } from './config.js';
-import { handleGitHubWebhook } from './handlers/github.js';
+import { createGitHubWebhookHandler } from './handlers/github.js';
+
+dotenv.config();
+
+const bot = createBot();
 
 const app = express();
 
-app.post('/api/webhooks/github', express.raw({ type: 'application/json' }), handleGitHubWebhook);
+app.post('/api/webhooks/github', express.raw({ type: 'application/json' }), createGitHubWebhookHandler(bot));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
