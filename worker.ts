@@ -7,6 +7,7 @@ type RuntimeBindings = Record<string, unknown>;
 
 let botInstance: ReturnType<typeof createBot> | undefined;
 let commandsInitialized = false;
+let telegramWebhookInitialized = false;
 
 function getBot(): ReturnType<typeof createBot> {
   if (!botInstance) {
@@ -27,6 +28,22 @@ async function ensureCommands(bot: ReturnType<typeof createBot>): Promise<void> 
     commandsInitialized = true;
   } catch (error) {
     console.warn('Failed to set bot commands in Cloudflare Worker (non-fatal):', error);
+  }
+}
+
+async function ensureTelegramWebhook(bot: ReturnType<typeof createBot>, origin: string): Promise<void> {
+  if (telegramWebhookInitialized) return;
+
+  const webhookUrl = `${origin.replace(/\/+$/, '')}/api/webhooks/telegram`;
+
+  try {
+    await bot.api.setWebhook(webhookUrl, {
+      drop_pending_updates: true,
+    });
+    telegramWebhookInitialized = true;
+    console.log(`Telegram webhook set to ${webhookUrl}`);
+  } catch (error) {
+    console.warn('Failed to set Telegram webhook:', error);
   }
 }
 
@@ -223,6 +240,8 @@ export default {
       const bot = getBot();
       await ensureCommands(bot);
       const url = new URL(request.url);
+
+      await ensureTelegramWebhook(bot, url.origin);
 
       if (url.pathname === '/' || url.pathname === '') {
         return renderHomePage();
