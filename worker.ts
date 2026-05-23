@@ -7,7 +7,6 @@ type RuntimeBindings = Record<string, unknown>;
 
 let botInstance: ReturnType<typeof createBot> | undefined;
 let commandsInitialized = false;
-let telegramWebhookInitialized = false;
 
 function getBot(): ReturnType<typeof createBot> {
   if (!botInstance) {
@@ -48,15 +47,12 @@ async function ensureTelegramWebhook(
   bot: ReturnType<typeof createBot>,
   origin: string,
 ): Promise<void> {
-  if (telegramWebhookInitialized) return;
-
   const webhookUrl = `${origin.replace(/\/+$/, "")}/api/webhooks/telegram`;
 
   try {
     await bot.api.setWebhook(webhookUrl, {
       drop_pending_updates: true,
     });
-    telegramWebhookInitialized = true;
     console.log(`Telegram webhook set to ${webhookUrl}`);
   } catch (error) {
     console.warn("Failed to set Telegram webhook:", error);
@@ -296,47 +292,36 @@ export default {
       await ensureCommands(bot);
       const url = new URL(request.url);
 
-      if (url.pathname === "/" || url.pathname === "") {
+      if (url.pathname === '/' || url.pathname === '') {
         await ensureTelegramWebhook(bot, url.origin);
         return renderHomePage();
       }
 
-      if (url.pathname === "/setup") {
+      if (url.pathname === '/setup') {
         await ensureTelegramWebhook(bot, url.origin);
-        return Response.json({
-          ok: true,
-          message: "Telegram webhook registered",
-        });
+        return Response.json({ ok: true, message: 'Telegram webhook registered' });
       }
 
-      if (url.pathname === "/health") {
-        return Response.json({ok: true});
+      if (url.pathname === '/health') {
+        return Response.json({ ok: true });
       }
 
-      if (url.pathname === "/debug/telegram") {
+      if (url.pathname === '/debug/telegram') {
         return getTelegramDebugInfo(bot, url.origin);
       }
 
-      if (
-        url.pathname === "/api/webhooks/telegram" &&
-        request.method === "POST"
-      ) {
-        return webhookCallback(
-          bot,
-          "cloudflare-mod",
-        )(request as Parameters<ReturnType<typeof webhookCallback>>[0]);
+      if (url.pathname === '/api/webhooks/telegram' && request.method === 'POST') {
+        await ensureTelegramWebhook(bot, url.origin);
+        return webhookCallback(bot, 'cloudflare-mod')(request as Parameters<ReturnType<typeof webhookCallback>>[0]);
       }
 
-      if (
-        url.pathname === "/api/webhooks/github" &&
-        request.method === "POST"
-      ) {
+      if (url.pathname === '/api/webhooks/github' && request.method === 'POST') {
         return handleGitHubWebhook(request);
       }
 
-      return new Response("Not found", {status: 404});
+      return new Response('Not found', { status: 404 });
     } catch (error) {
-      console.error("Worker fetch error:", error);
+      console.error('Worker fetch error:', error);
       return renderErrorResponse(error);
     }
   },
