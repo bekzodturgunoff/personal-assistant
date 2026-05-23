@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import crypto from 'crypto';
 import { bot } from '../bot.js';
 import { config } from '../config.js';
+import { getSubscribers } from '../subscribers.js';
 
 function tgEscape(text: string): string {
   return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
@@ -17,11 +18,42 @@ const CATCHPHRASES = [
 
 async function sendToGroup(message: string) {
   try {
-    await bot.api.sendMessage(config.telegramChatId, message, { parse_mode: 'MarkdownV2' });
+    const target = config.telegramChatId || undefined;
+    if (target) {
+      await bot.api.sendMessage(target, message, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+
+    // No fixed chat configured — send to all subscribed chats
+    const subs = getSubscribers();
+    if (!subs || subs.length === 0) {
+      console.warn('No Telegram chat configured and no subscribers found — skipping send');
+      return;
+    }
+
+    for (const id of subs) {
+      try {
+        await bot.api.sendMessage(id, message, { parse_mode: 'MarkdownV2' });
+      } catch (err) {
+        console.error('Failed to send to subscriber', id, err);
+      }
+    }
   } catch (err) {
     console.error('MarkdownV2 send failed, falling back to plain text:', err);
     try {
-      await bot.api.sendMessage(config.telegramChatId, message);
+      const target = config.telegramChatId || undefined;
+      if (target) {
+        await bot.api.sendMessage(target, message);
+        return;
+      }
+      const subs = getSubscribers();
+      for (const id of subs) {
+        try {
+          await bot.api.sendMessage(id, message);
+        } catch (e) {
+          console.error('Fallback send failed for subscriber', id, e);
+        }
+      }
     } catch (fallbackErr) {
       console.error('Fallback send also failed:', fallbackErr);
     }
