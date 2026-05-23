@@ -136,6 +136,79 @@ function isPrivateCommandLike(text: string): boolean {
   return lower === '/start' || lower === '/help' || lower === '/roast' || lower === '/stop' || lower === '/mute' || lower === '/resume' || lower === '/unmute' || lower === '/quiet';
 }
 
+function getCommandName(text: string): string | undefined {
+  const match = text.trim().match(/^\/([a-z0-9_]+)(?:@[a-z0-9_]+)?(?:\s|$)/i);
+  return match?.[1]?.toLowerCase();
+}
+
+type CommandContextLike = ReplyContext & {
+  chat?: { id: number; type: 'private' | 'group' | 'supergroup' | string };
+  from?: { username?: string };
+  me: { username?: string };
+  message?: { text?: string; reply_to_message?: { text?: string; from?: { id?: number } } };
+};
+
+async function handleCommandFallback(ctx: CommandContextLike, text: string): Promise<boolean> {
+  const command = getCommandName(text);
+  if (!command) return false;
+
+  const displayName = getDisplayName(ctx.from?.username);
+  const greeting = displayName ? `${displayName}, ` : '';
+
+  if (command === 'start') {
+    await replySafe(ctx, `${greeting}Octopos Agent tayyor. Men kodni ko‘rib chiqaman, savollarga javob beraman va kerak bo‘lsa hazil ham qilaman. 🔥`);
+    return true;
+  }
+
+  if (command === 'help') {
+    await replySafe(
+      ctx,
+      [
+        'Octopos Agent buyruqlari:',
+        '- /start — botni ishga tushirish',
+        '- /help — yordam',
+        '- /roast — reply qilingan kodni roast qilish',
+        '- /stop yoki /mute — shu chatda jim turish',
+        '- /resume yoki /unmute — qayta javob berishni yoqish',
+        '',
+        'Men odatda faqat menga murojaat qilinganda, reply qilinganda yoki savol/texnik so‘rov bo‘lganda javob beraman.',
+      ].join('\n'),
+    );
+    return true;
+  }
+
+  if (command === 'stop' || command === 'mute' || command === 'quiet') {
+    if (ctx.chat) {
+      muteChat(ctx.chat.id, 'command');
+    }
+    await replySafe(ctx, 'Tushunarli. Bu chatda jim turaman. Qayta yoqish uchun /resume yozing.');
+    return true;
+  }
+
+  if (command === 'resume' || command === 'unmute') {
+    if (ctx.chat) {
+      unmuteChat(ctx.chat.id);
+    }
+    await replySafe(ctx, 'Yoqildi. Endi yana javob beraman.');
+    return true;
+  }
+
+  if (command === 'roast') {
+    const reply = ctx.message?.reply_to_message;
+    if (!reply?.text) {
+      await replySafe(ctx, 'Kod blokiga yoki xabarga reply qilib /roast yozing, men uni roast qilaman!');
+      return true;
+    }
+
+    await replySafe(ctx, '🔥 Kuting, Octopos Agent tekshiryapti...');
+    const result = await roast(reply.text);
+    await ctx.reply(result);
+    return true;
+  }
+
+  return false;
+}
+
 type ReplyContext = {
   reply: (text: string) => Promise<unknown>;
 };
@@ -217,6 +290,11 @@ export function setupTelegramHandlers(bot: Bot) {
     const isReplyToBot = ctx.message.reply_to_message?.from?.id === botId;
     const isKeywordTriggered = isLocalJokeModeActive() && matchesFallbackTrigger(text);
     const chatMuted = isChatMuted(ctx.chat.id);
+
+    if (await handleCommandFallback(ctx as CommandContextLike, text)) {
+      return;
+    }
+
     const isStop = isStopRequest(text);
     const isResume = isResumeRequest(text);
 
