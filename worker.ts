@@ -311,8 +311,7 @@ export default {
       }
 
       if (url.pathname === '/api/webhooks/telegram' && request.method === 'POST') {
-        await ensureTelegramWebhook(bot, url.origin);
-        return webhookCallback(bot, 'cloudflare-mod')(request as Parameters<ReturnType<typeof webhookCallback>>[0]);
+        return webhookCallback(bot, 'cloudflare-mod', { timeoutMilliseconds: 25000 })(request, env);
       }
 
       if (url.pathname === '/api/webhooks/github' && request.method === 'POST') {
