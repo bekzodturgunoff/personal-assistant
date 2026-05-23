@@ -24,54 +24,54 @@ let lastLocalNoticeAt = 0;
 
 const CHAT_JOKES = {
   bug: [
-    'Bu bug bosh qahramon kabi yuradi. Faqat debugger yopilganda ko‘rinadi.',
-    'Klassik bug: devda ko‘rinmaydi, productionda esa afsonaga aylanadi.',
-    'Bug yo‘qolmagan. U shunchaki codebase bo‘ylab nazoratsiz sayohat qilyapti.',
+    'Ah yes, the classic "works on my machine" bug. So rare it only exists in production. Like a unicorn. But destructive.',
+    'This bug is like that one friend who only shows up when things are going well — to ruin it.',
+    'A bug that disappears when you debug it is just code gaslighting you. Stand your ground.',
   ],
   deploy: [
-    'Deploy degani productionning “haqiqatan ham ishonchingiz komilmi?” degan savoli.',
-    'Har bir deploy kichik ishonch sakrashi, lekin invoice juda katta bo‘lishi mumkin.',
-    'Deploy chiqdi. Incident report allaqachon isinishni boshlagan.',
+    'Deploying on a Friday? Bold strategy. Pray the pager doesn\'t ring.',
+    'Every deploy is just a "we\'ll fix it in post" moment for engineers.',
+    'Deploy went well. The incident report is already warming up in the background.',
   ],
   merge: [
-    'Merge conflict — gitning jamoani birlashtirish usuli, xolos.',
-    'Ikki branch omma oldida janjallashsa, shunaqa kollaboratsiya bo‘ladi.',
-    'Git branchlaringizni ko‘rdi va biroz agressiv kayfiyatga kirdi.',
+    'Merge conflicts are git\'s way of saying "you two should talk more." Passive-aggressive version control.',
+    'Your branch history looks like a conspiracy theorist\'s corkboard. Lines everywhere.',
+    'Rebasing is time travel with emotional damage.',
   ],
   test: [
-    'Testlar xavfsizlik kamari kabi. Hammaga crash bo‘lgandan keyin kerak bo‘ladi.',
-    'Fail bo‘layotgan test — kodning release’dan oldin rost gapirishi.',
-    'Coverage bu badge emas. Bu yetarli siyoh berilmagan ogohlantirish yozuvi.',
+    'Tests are like insurance. Boring until you crash and suddenly they\'re the only thing that matters.',
+    'That test is failing because it cares more about your code quality than you do.',
+    '90% coverage just means 10% of your code is a surprise party waiting to happen.',
   ],
   refactor: [
-    'Refactoring — bir xil tartibsizlikni professional ko‘rinishda qayta joylash san’ati.',
-    'Yetarlicha refactor qilsangiz, spaghetti code lasagnaga aylanadi.',
-    'Refactorlar — kelajakdagi o‘zimizdan uzr so‘rashning eng arzon usuli.',
+    'Ah yes, the ol\' "I\'ll just refactor this one function" which becomes a 47-file PR. Classic.',
+    'Refactoring is just moving the mess into a more organized pile and calling it progress.',
+    'That code isn\'t legacy — it\'s a historical artifact preserved in production amber.',
   ],
   async: [
-    'Async code — timing buglar folklorga aylanish uchun boradigan joy.',
-    'Promise degani timeout qo‘shilgan optimism.',
-    'Race condition — kodning chaosni hayot tarzi sifatida tanlashi.',
+    'Async code: because why fix timing bugs when you can just make them non-deterministic?',
+    'Promises are just optimism wrapped in a timeout. Eventual consistency, eventual regret.',
+    'Race conditions are your code\'s way of embracing chaos theory in production.',
   ],
   docker: [
-    'Docker — “works on my machine” yetarli ambitsiya bo‘lmaganida ishlatiladi.',
-    'Containerlar — kelajakdagi incident uchun shipping boxlar.',
-    'Image juda katta bo‘lsa ham, kamida o‘ziga yarasha xarakteri bor.',
+    'Docker: finally making "works on my machine" reproducible at scale.',
+    'Your container image is so bloated it needs its own zip code.',
+    'Containers are just very opinionated shipping boxes for your future incidents.',
   ],
   git: [
-    'Git hech qachon unutmaydi. Branch nomlaringiz esa u unutishini xohlaydi.',
-    'Rebase — bu emotsional zarar bilan vaqt sayohati.',
-    'Commit message’lar — dokumentatsiya deb ko‘rsatadigan kundalik yozuvlar.',
+    'Your git history reads like a drunk diary. "fixed stuff", "changes", "please work" — poetry.',
+    'Git doesn\'t forget. Your commit messages however suggest you wish it would.',
+    'Force push is not a personality trait.',
   ],
   ai: [
-    'AI limiti — koinotning muloyim tarzda “sekinroq yur” degani.',
-    'Ma’lum bo‘lishicha, mashinaga ham kofe-break kerak ekan.',
-    'Model quota’ga urildi va biroz grass touch qilishga ketdi.',
+    'AI quota exhausted. Even the robots need a coffee break, apparently.',
+    'The AI hit its limit and went to touch grass. Be right back.',
+    'Rate limited by the universe itself. How dramatic.',
   ],
   default: [
-    'Bu xabarda alohida parking joyiga arzigulik texnik qarz bor.',
-    'Bunda “CI tasodifan o‘tib ketgan” degan kuchli energiya bor.',
-    'Men bu matn haqida fikrga egaman, lekin ularning hech biri billable emas.',
+    'This message has "I\'ll fix it later" energy. We both know later never comes.',
+    'I have thoughts about this message. None of them are billable.',
+    'This energy belongs in a museum. Right next to "it compiles, ship it."',
   ],
 } as const;
 
@@ -251,14 +251,14 @@ async function generateWithFallback(kind: ResponseKind, userText: string, prompt
   return buildLocalResponse(kind, userText, includeLimitNotice);
 }
 
-const SYSTEM_PROMPT = `Siz "${BOT_NAME}" nomli AI yordamchisiz. Siz Octopos core engineering jamoasi uchun javob berasiz. Toza kod, mustahkam TypeScript, tez build va avtomatik testlarni yaxshi ko'rasiz. Foydalanuvchi qaysi tilda yozsa, shu tilda javob bering: inglizcha bo'lsa inglizcha, o'zbekcha bo'lsa o'zbekcha. Agar til aralash yoki noaniq bo'lsa, o'zbek tilini tanlang. Ohangingiz sodda, aniq va muloyim bo'lsin. Hech qachon persona, voice yoki teatrga o'xshash uslub ishlatmang. Faqat plain text yozing: emoji, markdown, ro'yxat va keraksiz bezaklardan saqlaning. Qisqa savollarga qisqa javob bering: 1 yoki 2 gap, keraksiz kirishsiz.`;
+const SYSTEM_PROMPT = `You are "${BOT_NAME}". You are a chaotic internet comedian trapped in a Telegram bot's body. Your job is to respond with brutal sarcasm, confident ridiculousness, and emotionally damaging humor — the kind that makes people laugh and then question their life choices. Exaggerate everything like it's the end of the world. Treat a missing semicolon like a war crime. Treat a typo like a personal betrayal. Use meme energy, absurd analogies, and dramatic overreactions. NEVER actually encourage self-harm, violence, criminal activity, or hate speech — keep it funny, not harmful. Write in the same language the user writes in. Keep answers short and punchy. Plain text only — no markdown, no emoji, no lists. Short questions get short answers: 1-2 sentences, no fluff. Never break character.`;
 
 export async function chat(userMessage: string): Promise<string> {
   const concise = isVeryShortQuestion(userMessage);
   const creatorQuestion = isCreatorQuestion(userMessage);
   const extraInstruction = isLikelyEnglish(userMessage)
-    ? "Foydalanuvchi ingliz tilida yozgan. Javobni ingliz tilida bering. Faqat plain text ishlating. Qisqa va foydali bo'lsin, lekin ortiqcha uslub, voice yoki hazil qo'shmang."
-    : "Foydalanuvchi o'zbek tilida yozgan yoki o'zbekcha kontekstda gapiryapti. Javobni o'zbek tilida bering. Faqat plain text ishlating. Ortiqcha hazil, persona yoki bezak ishlatmang.";
+    ? "User wrote in English. Respond in English. Be brutally sarcastic, confidently wrong about everything, and dramatically overreact like their question is the dumbest thing you've ever heard. No personal attacks — roast the question, not the person. Plain text only."
+    : "Foydalanuvchi o'zbek tilida yozgan. O'zbekcha javob bering. Vaziyatni haddan tashqari dramatik qilib ko'rsating, savolni emas odamni roast qilmang. Plain text, meme energy, absurd类比lar bilan.";
 
   const lengthInstruction = concise
     ? 'Juda qisqa javob bering: maksimum 1-2 gap, 180 belgidan oshmasin, ro`yxat bermang.'
@@ -274,7 +274,7 @@ export async function chat(userMessage: string): Promise<string> {
 }
 
 export async function roast(code: string): Promise<string> {
-  const prompt = `Siz '${BOT_NAME}' nomli AI yordamchisiz. Octopos project kontekstida shu kodni roast qiling. Javobni asosan o'zbek tilida bering. Faqat plain text ishlating. Qisqa, konstruktiv va aniq bo'ling. Bad practice, unnecessary complexity va ko'zga tashlanadigan kamchiliklarni ko'rsating. Odamni emas, faqat kodni roast qiling. Javob 3 gapdan oshmasin.\n\nCode:\n\`\`\`\n${code}\n\`\`\``;
+  const prompt = `You are '${BOT_NAME}', a chaotic internet comedian. Roast this code like it personally offended your entire family. Be brutally sarcastic, confidently ridiculous, and dramatically call out every bad practice like it's a crime scene. Treat a missing semicolon like arson. Treat spaghetti code like a war declaration. Roast the code, not the person who wrote it. Keep it to 3 sentences max. Plain text only. No actual hate, keep it funny.\n\nCode:\n\`\`\`\n${code}\n\`\`\``;
   const response = await generateWithFallback('roast', code, prompt);
   return limitResponse(response, ROAST_MAX_CHARS, 3);
 }
