@@ -8,7 +8,7 @@ function getAiClient(): GoogleGenAI {
   if (!aiClient) {
     const apiKey = config.aiApiKey;
     if (!apiKey) {
-      throw new Error('AI_API_KEY is not configured — AI features unavailable');
+      throw new Error("AI_API_KEY is not configured — AI features unavailable");
     }
     aiClient = new GoogleGenAI({apiKey});
   }
@@ -57,21 +57,27 @@ const PRIMARY_COOLDOWN_MS = 10 * 60 * 1000;
 let primaryRetryAt = 0;
 
 function isQuotaOrRateLimitError(error: unknown): boolean {
-  const candidate = error as { status?: unknown; code?: unknown; message?: unknown };
-  const status = typeof candidate?.status === 'number' ? candidate.status : undefined;
-  const code = typeof candidate?.code === 'string' ? candidate.code.toLowerCase() : '';
-  const message = String(candidate?.message ?? '').toLowerCase();
+  const candidate = error as {
+    status?: unknown;
+    code?: unknown;
+    message?: unknown;
+  };
+  const status =
+    typeof candidate?.status === "number" ? candidate.status : undefined;
+  const code =
+    typeof candidate?.code === "string" ? candidate.code.toLowerCase() : "";
+  const message = String(candidate?.message ?? "").toLowerCase();
 
   return (
     status === 429 ||
     status === 403 ||
-    code.includes('resource_exhausted') ||
-    code.includes('quota') ||
-    message.includes('resource_exhausted') ||
-    message.includes('quota') ||
-    message.includes('rate limit') ||
-    message.includes('too many requests') ||
-    message.includes('limit exceeded')
+    code.includes("resource_exhausted") ||
+    code.includes("quota") ||
+    message.includes("resource_exhausted") ||
+    message.includes("quota") ||
+    message.includes("rate limit") ||
+    message.includes("too many requests") ||
+    message.includes("limit exceeded")
   );
 }
 
@@ -183,17 +189,23 @@ function pickJoke(topic: keyof typeof CHAT_JOKES, seed: string): string {
 function detectTopic(text: string): keyof typeof CHAT_JOKES {
   const lower = text.toLowerCase();
 
-  if (/\b(bug|error|exception|crash|null|traceback|stack trace)\b/.test(lower)) return 'bug';
-  if (/\b(deploy|release|ship|production|prod|rollout)\b/.test(lower)) return 'deploy';
-  if (/\b(merge|conflict|pull request|pr\b|branch)\b/.test(lower)) return 'merge';
-  if (/\b(test|tests|coverage|jest|vitest|mocha|pytest)\b/.test(lower)) return 'test';
-  if (/\b(refactor|refactoring|cleanup|spaghetti|legacy)\b/.test(lower)) return 'refactor';
-  if (/\b(async|await|promise|race|timeout)\b/.test(lower)) return 'async';
-  if (/\b(docker|container|image|kubernetes|k8s)\b/.test(lower)) return 'docker';
-  if (/\b(git|commit|rebase|cherry-pick|stash)\b/.test(lower)) return 'git';
-  if (/\b(ai|model|token|quota|prompt|llm)\b/.test(lower)) return 'ai';
+  if (/\b(bug|error|exception|crash|null|traceback|stack trace)\b/.test(lower))
+    return "bug";
+  if (/\b(deploy|release|ship|production|prod|rollout)\b/.test(lower))
+    return "deploy";
+  if (/\b(merge|conflict|pull request|pr\b|branch)\b/.test(lower))
+    return "merge";
+  if (/\b(test|tests|coverage|jest|vitest|mocha|pytest)\b/.test(lower))
+    return "test";
+  if (/\b(refactor|refactoring|cleanup|spaghetti|legacy)\b/.test(lower))
+    return "refactor";
+  if (/\b(async|await|promise|race|timeout)\b/.test(lower)) return "async";
+  if (/\b(docker|container|image|kubernetes|k8s)\b/.test(lower))
+    return "docker";
+  if (/\b(git|commit|rebase|cherry-pick|stash)\b/.test(lower)) return "git";
+  if (/\b(ai|model|token|quota|prompt|llm)\b/.test(lower)) return "ai";
 
-  return 'default';
+  return "default";
 }
 
 export function isLocalJokeModeActive(): boolean {
@@ -201,7 +213,7 @@ export function isLocalJokeModeActive(): boolean {
 }
 
 export function matchesFallbackTrigger(text: string): boolean {
-  return detectTopic(text) !== 'default';
+  return detectTopic(text) !== "default";
 }
 
 const SYSTEM_PROMPT = `
@@ -260,20 +272,32 @@ Treat bad code like a federal investigation.
 Treat production outages like supernatural disasters.
 `;
 const COMMAND_CONTEXT: Record<string, string> = {
-  start: "The user just activated you. Greet them with chaotic energy, mention you're ready to review code, answer questions, and roast their PRs. Make it clear you're a force of nature, not a corporate bot.",
+  start:
+    "The user just activated you. Greet them with chaotic energy, mention you're ready to review code, answer questions, and roast their PRs. Make it clear you're a force of nature, not a corporate bot.",
   help: "The user asked for help. Be dramatic about it — list what you can do but in a sarcastic, meme way. Code review, roasting, debugging, general chaos. Make them almost regret asking.",
   stop: "The user told you to shut up. Accept this with theatrical disappointment. Be dramatic about being silenced. But confirm you'll be quiet until /resume.",
-  resume: "The user unmuted you. Explode back into existence with chaotic energy. Let them know they made a mistake by waking you up.",
-  roast: "The user tried to roast something but didn't reply to a code message. Mock them gently for not knowing how the command works.",
-  person: "The user asked if you know someone. Respond in-character — pretend to know them with an exaggerated, dramatic backstory.",
-  laugh: "The user asked you to make them laugh or just laughed themselves. Fire back a one-liner that fits your chaotic comedian persona.",
-  mute_natural: "The user told you to shut up in natural language (not a command). React with dramatic betrayal and hurt, then accept your silence.",
-  resume_natural: "The user told you to start talking again in natural language. Burst back with way too much chaotic energy.",
+  resume:
+    "The user unmuted you. Explode back into existence with chaotic energy. Let them know they made a mistake by waking you up.",
+  roast:
+    "The user tried to roast something but didn't reply to a code message. Mock them gently for not knowing how the command works.",
+  person:
+    "The user asked if you know someone. Respond in-character — pretend to know them with an exaggerated, dramatic backstory.",
+  laugh:
+    "The user asked you to make them laugh or just laughed themselves. Fire back a one-liner that fits your chaotic comedian persona.",
+  mute_natural:
+    "The user told you to shut up in natural language (not a command). React with dramatic betrayal and hurt, then accept your silence.",
+  resume_natural:
+    "The user told you to start talking again in natural language. Burst back with way too much chaotic energy.",
 };
 
-export async function commandResponse(command: string, displayName?: string): Promise<string> {
+export async function commandResponse(
+  command: string,
+  displayName?: string,
+): Promise<string> {
   const context = COMMAND_CONTEXT[command] ?? COMMAND_CONTEXT.help;
-  const greeting = displayName ? `The user's name is ${displayName}. Use it naturally.` : "";
+  const greeting = displayName
+    ? `The user's name is ${displayName}. Use it naturally.`
+    : "";
   const personality = randomPersonality();
 
   const prompt = `

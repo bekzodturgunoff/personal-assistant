@@ -1,4 +1,4 @@
-import { getEnv } from './runtime-env.js';
+import {getEnv} from "./runtime-env.js";
 
 function requireEnv(name: string): string {
   const value = getEnv(name);
@@ -10,20 +10,20 @@ function requireEnv(name: string): string {
 
 export const config = {
   get telegramBotToken() {
-    return requireEnv('TELEGRAM_BOT_TOKEN');
+    return requireEnv("TELEGRAM_BOT_TOKEN");
   },
   get aiApiKey() {
-    return getEnv('AI_API_KEY') || '';
+    return getEnv("AI_API_KEY") || "";
   },
   // telegramChatId is optional. If set, GitHub notifications go there.
   // Otherwise the bot will use subscribed chats discovered at runtime.
   get telegramChatId() {
-    return getEnv('TELEGRAM_CHAT_ID') || '';
+    return getEnv("TELEGRAM_CHAT_ID") || "";
   },
   get port() {
-    return parseInt(getEnv('PORT') || '3000', 10);
+    return parseInt(getEnv("PORT") || "3000", 10);
   },
   get githubWebhookSecret() {
-    return getEnv('GITHUB_WEBHOOK_SECRET') || '';
+    return getEnv("GITHUB_WEBHOOK_SECRET") || "";
   },
 };

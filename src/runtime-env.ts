@@ -12,13 +12,13 @@ export function setRuntimeEnv(env: EnvLike): void {
 export function getEnv(name: string): string | undefined {
   const runtimeEnv = globalThis.__OCTOPOS_ENV__;
   const runtimeValue = runtimeEnv?.[name];
-  if (typeof runtimeValue === 'string' && runtimeValue.length > 0) {
+  if (typeof runtimeValue === "string" && runtimeValue.length > 0) {
     return runtimeValue;
   }
 
-  if (typeof process !== 'undefined' && process.env) {
+  if (typeof process !== "undefined" && process.env) {
     const processValue = process.env[name];
-    if (typeof processValue === 'string' && processValue.length > 0) {
+    if (typeof processValue === "string" && processValue.length > 0) {
       return processValue;
     }
   }

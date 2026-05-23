@@ -1,60 +1,68 @@
-import dotenv from 'dotenv';
-import express from 'express';
-import { webhookCallback } from 'grammy/web';
-import { createBot } from './bot.js';
-import { config } from './config.js';
-import { getEnv } from './runtime-env.js';
-import { createGitHubWebhookHandler } from './handlers/github.js';
+import dotenv from "dotenv";
+import express from "express";
+import {webhookCallback} from "grammy/web";
+import {createBot} from "./bot.js";
+import {config} from "./config.js";
+import {getEnv} from "./runtime-env.js";
+import {createGitHubWebhookHandler} from "./handlers/github.js";
 
 dotenv.config();
 
 const app = express();
 
-app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get("/health", (_req, res) => res.json({ok: true}));
 
 async function main() {
-  const telegramToken = getEnv('TELEGRAM_BOT_TOKEN');
+  const telegramToken = getEnv("TELEGRAM_BOT_TOKEN");
   if (!telegramToken) {
-    console.error('TELEGRAM_BOT_TOKEN is not set. Set it in .env or as an environment variable.');
-    console.error('Bot will not start. The /health endpoint is still available.');
+    console.error(
+      "TELEGRAM_BOT_TOKEN is not set. Set it in .env or as an environment variable.",
+    );
+    console.error(
+      "Bot will not start. The /health endpoint is still available.",
+    );
     return;
   }
 
   const bot = createBot();
-  const webhookUrl = getEnv('WEBHOOK_URL');
+  const webhookUrl = getEnv("WEBHOOK_URL");
   const commands = [
-    { command: 'start', description: 'Start OctoBot' },
-    { command: 'help', description: 'Show help' },
-    { command: 'roast', description: 'Roast replied code' },
-    { command: 'stop', description: 'Mute OctoBot in this chat' },
-    { command: 'resume', description: 'Re-enable OctoBot in this chat' },
+    {command: "start", description: "Start OctoBot"},
+    {command: "help", description: "Show help"},
+    {command: "roast", description: "Roast replied code"},
+    {command: "stop", description: "Mute OctoBot in this chat"},
+    {command: "resume", description: "Re-enable OctoBot in this chat"},
   ] as const;
 
-  app.post('/api/webhooks/github', express.raw({ type: 'application/json' }), createGitHubWebhookHandler(bot));
+  app.post(
+    "/api/webhooks/github",
+    express.raw({type: "application/json"}),
+    createGitHubWebhookHandler(bot),
+  );
 
   try {
     await Promise.all([
       bot.api.setMyCommands(commands),
-      bot.api.setMyCommands(commands, { scope: { type: 'all_private_chats' } }),
-      bot.api.setMyCommands(commands, { scope: { type: 'all_group_chats' } }),
+      bot.api.setMyCommands(commands, {scope: {type: "all_private_chats"}}),
+      bot.api.setMyCommands(commands, {scope: {type: "all_group_chats"}}),
     ]);
   } catch (err) {
-    console.warn('Failed to set bot commands (non-fatal):', err);
+    console.warn("Failed to set bot commands (non-fatal):", err);
   }
 
   if (webhookUrl) {
     try {
-      const whUrl = `${webhookUrl.replace(/\/+$/, '')}/api/webhooks/telegram`;
+      const whUrl = `${webhookUrl.replace(/\/+$/, "")}/api/webhooks/telegram`;
       await bot.api.setWebhook(whUrl);
-      app.post('/api/webhooks/telegram', webhookCallback(bot, 'express'));
+      app.post("/api/webhooks/telegram", webhookCallback(bot, "express"));
       console.log(`Bot webhook set to ${whUrl}`);
     } catch (err) {
-      console.error('Failed to set webhook, falling back to polling:', err);
+      console.error("Failed to set webhook, falling back to polling:", err);
       bot.start();
     }
   } else {
-    bot.start({ drop_pending_updates: true });
-    console.log('Bot started in polling mode — no WEBHOOK_URL set');
+    bot.start({drop_pending_updates: true});
+    console.log("Bot started in polling mode — no WEBHOOK_URL set");
   }
 
   app.listen(config.port, () => {
@@ -63,6 +71,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('Fatal startup error:', err);
+  console.error("Fatal startup error:", err);
   process.exit(1);
 });
