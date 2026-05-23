@@ -12,6 +12,16 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 
 async function main() {
   const webhookUrl = process.env.WEBHOOK_URL;
+  // Register bot commands so they show up in Telegram clients
+  try {
+    await bot.api.setMyCommands([
+      { command: 'start', description: 'Start OctoBot' },
+      { command: 'help', description: 'Show help' },
+      { command: 'roast', description: 'Roast replied code' },
+    ]);
+  } catch (err) {
+    console.warn('Failed to set bot commands (non-fatal):', err);
+  }
 
   if (webhookUrl) {
     try {

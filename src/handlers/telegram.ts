@@ -1,8 +1,20 @@
 import { Bot } from 'grammy';
-import { chat, roast } from '../ai.js';
+import { chat, isLocalJokeModeActive, matchesFallbackTrigger, roast } from '../ai.js';
 import { addSubscriber, removeSubscriber } from '../subscribers.js';
 
 export function setupTelegramHandlers(bot: Bot) {
+  // Optional debugging: set DEBUG_LOG_UPDATES=true to log every incoming update
+  if (process.env.DEBUG_LOG_UPDATES === 'true') {
+    bot.use(async (ctx, next) => {
+      try {
+        console.log('Incoming update:', JSON.stringify(ctx.update, null, 2));
+      } catch (e) {
+        // ignore
+      }
+      await next();
+    });
+  }
+
   bot.command('start', async (ctx) => {
     await ctx.reply('OctoBot online. Ready to judge your code. 🔥');
   });
@@ -37,8 +49,9 @@ export function setupTelegramHandlers(bot: Bot) {
     const text = ctx.message.text ?? '';
     const isMentioned = text.includes(`@${ctx.me.username}`);
     const isReplyToBot = ctx.message.reply_to_message?.from?.id === botId;
+    const isKeywordTriggered = isLocalJokeModeActive() && matchesFallbackTrigger(text);
 
-    if (!isMentioned && !isReplyToBot) return;
+    if (!isMentioned && !isReplyToBot && !isKeywordTriggered) return;
 
     await ctx.replyWithChatAction('typing');
     const response = await chat(text);
