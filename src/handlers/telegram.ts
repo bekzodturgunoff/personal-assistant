@@ -1,9 +1,10 @@
-import { Bot } from 'grammy';
+import type { Bot } from 'grammy/web';
 import { chat, isLocalJokeModeActive, matchesFallbackTrigger, roast } from '../ai.js';
+import { getEnv } from '../runtime-env.js';
 
 export function setupTelegramHandlers(bot: Bot) {
   // Optional debugging: set DEBUG_LOG_UPDATES=true to log every incoming update
-  if (process.env.DEBUG_LOG_UPDATES === 'true') {
+  if (getEnv('DEBUG_LOG_UPDATES') === 'true') {
     bot.use(async (ctx, next) => {
       try {
         console.log('Incoming update:', JSON.stringify(ctx.update, null, 2));
