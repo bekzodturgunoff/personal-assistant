@@ -22,13 +22,13 @@ export function setupTelegramHandlers(bot: Bot) {
   bot.command('help', async (ctx) => {
     await ctx.reply(
       [
-        '*OctoBot Commands*',
+        '*OctoBot buyruqlari*',
         '',
-          '*OctoBot buyruqlari*',
-        '\\- `/roast` \\(reply to code\\) \\- Get a brutal code review',
-          '\- Meni tag qiling yoki xabarimga reply qiling',
-          '\- `/roast` \(kodga reply qiling\) \- Qiziqarli va foydali roast',
-          '\- `/help` \- Shu yordam xabarini ko‘rsatadi',
+        '\- Meni tag qiling yoki xabarimga reply qiling',
+        '\- `/roast` \(kodga reply qiling\) \- Qiziqarli va foydali roast',
+        '\- `/help` \- Shu yordam xabarini ko‘rsatadi',
+      ].join('\n'),
+      { parse_mode: 'MarkdownV2' },
     );
   });
 
