@@ -1,7 +1,6 @@
 import { webhookCallback } from 'grammy/web';
 import { createBot } from './src/bot.js';
 import { config } from './src/config.js';
-import { getSubscribers } from './src/subscribers.js';
 import { setRuntimeEnv } from './src/runtime-env.js';
 
 type RuntimeBindings = Record<string, unknown>;
@@ -47,24 +46,12 @@ async function sendToGroup(message: string): Promise<void> {
   const bot = getBot();
   const target = config.telegramChatId || undefined;
 
-  if (target) {
-    await bot.api.sendMessage(target, message, { parse_mode: 'MarkdownV2' });
+  if (!target) {
+    console.warn('TELEGRAM_CHAT_ID is not configured — skipping GitHub notification');
     return;
   }
 
-  const subscribers = await getSubscribers();
-  if (subscribers.length === 0) {
-    console.warn('No Telegram chat configured and no subscribers found — skipping send');
-    return;
-  }
-
-  for (const id of subscribers) {
-    try {
-      await bot.api.sendMessage(id, message, { parse_mode: 'MarkdownV2' });
-    } catch (error) {
-      console.error('Failed to send to subscriber', id, error);
-    }
-  }
+  await bot.api.sendMessage(target, message, { parse_mode: 'MarkdownV2' });
 }
 
 async function verifyGitHubSignature(secret: string, rawBody: string, signature: string): Promise<boolean> {

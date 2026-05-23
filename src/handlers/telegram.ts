@@ -1,6 +1,5 @@
 import { Bot } from 'grammy';
 import { chat, isLocalJokeModeActive, matchesFallbackTrigger, roast } from '../ai.js';
-import { addSubscriber, removeSubscriber } from '../subscribers.js';
 
 export function setupTelegramHandlers(bot: Bot) {
   // Optional debugging: set DEBUG_LOG_UPDATES=true to log every incoming update
@@ -58,24 +57,4 @@ export function setupTelegramHandlers(bot: Bot) {
     await ctx.reply(response, { link_preview_options: { is_disabled: true } });
   });
 
-  // Auto-subscribe when the bot is added to a chat or removed
-  bot.on('my_chat_member', async (ctx) => {
-    try {
-      const newStatus = ctx.update.my_chat_member?.new_chat_member?.status;
-      const chat = ctx.update.my_chat_member?.chat;
-      if (!chat || typeof chat.id !== 'number') return;
-      const chatId = chat.id as number;
-
-      if (newStatus === 'member' || newStatus === 'administrator') {
-        await addSubscriber(chatId);
-        await ctx.api.sendMessage(chatId, 'OctoBot bu chatga ulandi. Endi GitHub bildirishnomalari va kodli suhbatlar shu yerda ishlaydi. Meni tag qilib ko‘ring!', { link_preview_options: { is_disabled: true } });
-      }
-
-      if (newStatus === 'left' || newStatus === 'kicked') {
-        await removeSubscriber(chatId);
-      }
-    } catch (err) {
-      console.error('my_chat_member handler error:', err);
-    }
-  });
 }
