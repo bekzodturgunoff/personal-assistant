@@ -49,6 +49,28 @@ async function ensureTelegramWebhook(bot: ReturnType<typeof createBot>, origin: 
   }
 }
 
+async function getTelegramDebugInfo(bot: ReturnType<typeof createBot>, origin: string): Promise<Response> {
+  try {
+    const [me, webhookInfo] = await Promise.all([
+      bot.api.getMe(),
+      bot.api.getWebhookInfo(),
+    ]);
+
+    return Response.json({
+      ok: true,
+      bot: {
+        id: me.id,
+        username: me.username,
+        first_name: me.first_name,
+      },
+      webhook: webhookInfo,
+      expectedWebhookUrl: `${origin.replace(/\/+$/, '')}/api/webhooks/telegram`,
+    });
+  } catch (error) {
+    return renderErrorResponse(error);
+  }
+}
+
 function tgEscape(text: string): string {
   return text.replace(/[_*[\\]()~`>#+\-=|{}.!]/g, '\\$&');
 }
@@ -243,14 +265,22 @@ export default {
       await ensureCommands(bot);
       const url = new URL(request.url);
 
-      await ensureTelegramWebhook(bot, url.origin);
-
       if (url.pathname === '/' || url.pathname === '') {
+        await ensureTelegramWebhook(bot, url.origin);
         return renderHomePage();
+      }
+
+      if (url.pathname === '/setup') {
+        await ensureTelegramWebhook(bot, url.origin);
+        return Response.json({ ok: true, message: 'Telegram webhook registered' });
       }
 
       if (url.pathname === '/health') {
         return Response.json({ ok: true });
+      }
+
+      if (url.pathname === '/debug/telegram') {
+        return getTelegramDebugInfo(bot, url.origin);
       }
 
       if (url.pathname === '/api/webhooks/telegram' && request.method === 'POST') {
