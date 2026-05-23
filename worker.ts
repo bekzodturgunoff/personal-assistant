@@ -24,6 +24,8 @@ async function ensureCommands(bot: ReturnType<typeof createBot>): Promise<void> 
       { command: 'start', description: 'Start OctoBot' },
       { command: 'help', description: 'Show help' },
       { command: 'roast', description: 'Roast replied code' },
+      { command: 'stop', description: 'Mute OctoBot in this chat' },
+      { command: 'resume', description: 'Re-enable OctoBot in this chat' },
     ]);
     commandsInitialized = true;
   } catch (error) {

@@ -23,6 +23,8 @@ async function main() {
       { command: 'start', description: 'Start OctoBot' },
       { command: 'help', description: 'Show help' },
       { command: 'roast', description: 'Roast replied code' },
+      { command: 'stop', description: 'Mute OctoBot in this chat' },
+      { command: 'resume', description: 'Re-enable OctoBot in this chat' },
     ]);
   } catch (err) {
     console.warn('Failed to set bot commands (non-fatal):', err);
