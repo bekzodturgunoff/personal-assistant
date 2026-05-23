@@ -6,7 +6,11 @@ let aiClient: GoogleGenAI | undefined;
 
 function getAiClient(): GoogleGenAI {
   if (!aiClient) {
-    aiClient = new GoogleGenAI({apiKey: config.aiApiKey});
+    const apiKey = config.aiApiKey;
+    if (!apiKey) {
+      throw new Error('AI_API_KEY is not configured — AI features unavailable');
+    }
+    aiClient = new GoogleGenAI({apiKey});
   }
   return aiClient;
 }

@@ -13,7 +13,7 @@ export const config = {
     return requireEnv('TELEGRAM_BOT_TOKEN');
   },
   get aiApiKey() {
-    return requireEnv('AI_API_KEY');
+    return getEnv('AI_API_KEY') || '';
   },
   // telegramChatId is optional. If set, GitHub notifications go there.
   // Otherwise the bot will use subscribed chats discovered at runtime.

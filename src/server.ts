@@ -3,20 +3,25 @@ import express from 'express';
 import { webhookCallback } from 'grammy/web';
 import { createBot } from './bot.js';
 import { config } from './config.js';
+import { getEnv } from './runtime-env.js';
 import { createGitHubWebhookHandler } from './handlers/github.js';
 
 dotenv.config();
 
-const bot = createBot();
-
 const app = express();
-
-app.post('/api/webhooks/github', express.raw({ type: 'application/json' }), createGitHubWebhookHandler(bot));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 async function main() {
-  const webhookUrl = process.env.WEBHOOK_URL;
+  const telegramToken = getEnv('TELEGRAM_BOT_TOKEN');
+  if (!telegramToken) {
+    console.error('TELEGRAM_BOT_TOKEN is not set. Set it in .env or as an environment variable.');
+    console.error('Bot will not start. The /health endpoint is still available.');
+    return;
+  }
+
+  const bot = createBot();
+  const webhookUrl = getEnv('WEBHOOK_URL');
   const commands = [
     { command: 'start', description: 'Start OctoBot' },
     { command: 'help', description: 'Show help' },
@@ -25,7 +30,8 @@ async function main() {
     { command: 'resume', description: 'Re-enable OctoBot in this chat' },
   ] as const;
 
-  // Register bot commands so they show up in Telegram clients
+  app.post('/api/webhooks/github', express.raw({ type: 'application/json' }), createGitHubWebhookHandler(bot));
+
   try {
     await Promise.all([
       bot.api.setMyCommands(commands),
