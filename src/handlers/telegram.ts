@@ -60,17 +60,50 @@ function isDirectBotAddress(text: string, username: string | undefined): boolean
   return lower.includes(`@${normalizedName}`) || /\boctobot\b|\bocto bot\b|\bbot\b/i.test(lower);
 }
 
-function shouldAutoRespondInGroup(text: string): boolean {
+function scoreGroupMessage(text: string): number {
   const lower = text.toLowerCase();
-  if (lower.trim().length < 2) return false;
+  const compact = lower.trim();
 
-  if (lower.startsWith('/')) return false;
+  if (!compact || compact.startsWith('/')) return -100;
 
-  const questionIntent = /\?/.test(text) || /^(why|what|how|when|where|who|which|help|please|can you|could you|would you|should i|is it|does it|do you|explain|review|fix|debug|roast|summarize|summarise)\b/i.test(lower);
-  const techIntent = /\b(code|bug|error|issue|deploy|merge|conflict|test|refactor|ai|prompt|model|bot|telegram|github|worker|cloudflare|typescript|react|node|api)\b/i.test(lower);
-  const conversationalIntent = /^(hi|hello|hey|salom|assalomu alaykum|yoo|bro|team)\b/i.test(lower);
+  let score = 0;
 
-  return questionIntent || techIntent || conversationalIntent || lower.length >= 12;
+  if (/\?/.test(text)) score += 2;
+
+  if (/^(why|what|how|when|where|who|which|help|please|can you|could you|would you|should i|is it|does it|do you|explain|review|fix|debug|roast|suggest|check|look at|what do you think)\b/i.test(compact)) {
+    score += 2;
+  }
+
+  if (/\b(code|bug|error|issue|deploy|merge|conflict|test|refactor|ai|prompt|model|bot|telegram|github|worker|cloudflare|typescript|react|node|api|build|commit|branch|ci|pipeline)\b/i.test(compact)) {
+    score += 2;
+  }
+
+  if (/```|`[^`]+`|\bfunction\b|\bconst\b|\bclass\b|\breturn\b|[{}();]/.test(text)) {
+    score += 2;
+  }
+
+  if (/^(hi|hello|hey|salom|assalomu alaykum|yoo|bro|team|assalomu)\b/i.test(compact)) {
+    score += 1;
+  }
+
+  if (/\b(thanks|thank you|pls|please|ok|okay|cool|nice|lol|haha)\b/i.test(compact)) {
+    score += 1;
+  }
+
+  if (compact.length > 20 && compact.length < 220 && /\b(should|could|would|can|may|might|need to|want to|let's|lets)\b/i.test(compact)) {
+    score += 1;
+  }
+
+  if (compact.length > 160 && score < 2) {
+    score -= 1;
+  }
+
+  return score;
+}
+
+function shouldAutoRespondInGroup(text: string): boolean {
+  const score = scoreGroupMessage(text);
+  return score >= 2;
 }
 
 function shouldReplyToMessage(params: {
@@ -227,6 +260,13 @@ export function setupTelegramHandlers(bot: Bot) {
 
     if ((ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') && !canReplyInGroup(ctx.chat.id)) {
       return;
+    }
+
+    if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
+      const groupScore = scoreGroupMessage(text);
+      if (!isMentioned && !isReplyToBot && !isKeywordTriggered && groupScore < 2) {
+        return;
+      }
     }
 
     const shouldReply = shouldReplyToMessage({
