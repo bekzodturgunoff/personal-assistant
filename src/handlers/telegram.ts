@@ -16,7 +16,7 @@ export function setupTelegramHandlers(bot: Bot) {
   }
 
   bot.command('start', async (ctx) => {
-    await ctx.reply('OctoBot online. Ready to judge your code. 🔥');
+    await ctx.reply('OctoBot tayyor. Octopos kodini ko‘rib chiqishga va biroz hazil qilishga shayman. 🔥');
   });
 
   bot.command('help', async (ctx) => {
@@ -24,22 +24,22 @@ export function setupTelegramHandlers(bot: Bot) {
       [
         '*OctoBot Commands*',
         '',
-        '\\- Tag me or reply to my messages to chat',
+          '*OctoBot buyruqlari*',
         '\\- `/roast` \\(reply to code\\) \\- Get a brutal code review',
-        '\\- `/help` \\- Show this message',
-      ].join('\n'),
-      { parse_mode: 'MarkdownV2' },
+          '\- Meni tag qiling yoki xabarimga reply qiling',
+          '\- `/roast` \(kodga reply qiling\) \- Qiziqarli va foydali roast',
+          '\- `/help` \- Shu yordam xabarini ko‘rsatadi',
     );
   });
 
   bot.command('roast', async (ctx) => {
     const reply = ctx.message?.reply_to_message;
     if (!reply?.text) {
-      await ctx.reply('Reply to a code block or message with `/roast` to get it roasted!', { parse_mode: 'MarkdownV2' });
+      await ctx.reply('Kod blokiga yoki xabarga reply qilib `/roast` yozing, men uni roast qilaman!', { parse_mode: 'MarkdownV2' });
       return;
     }
 
-    await ctx.reply('🔥 Let me sharpen my claws...');
+    await ctx.reply('🔥 Kuting, OctoBot tirnoqlarini charxlayapti...');
     const result = await roast(reply.text);
     await ctx.reply(result);
   });
@@ -68,7 +68,7 @@ export function setupTelegramHandlers(bot: Bot) {
 
       if (newStatus === 'member' || newStatus === 'administrator') {
         addSubscriber(chatId);
-        await ctx.api.sendMessage(chatId, 'OctoBot subscribed to this chat for GitHub notifications and chat commands. Try mentioning me!', { disable_web_page_preview: true });
+        await ctx.api.sendMessage(chatId, 'OctoBot bu chatga ulandi. Endi GitHub bildirishnomalari va kodli suhbatlar shu yerda ishlaydi. Meni tag qilib ko‘ring!', { link_preview_options: { is_disabled: true } });
       }
 
       if (newStatus === 'left' || newStatus === 'kicked') {

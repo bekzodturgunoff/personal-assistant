@@ -16,54 +16,54 @@ let lastLocalNoticeAt = 0;
 
 const CHAT_JOKES = {
   bug: [
-    'That bug has strong main-character energy. It only appears when the debugger is closed.',
-    'Classic bug behavior: invisible in dev, legendary in production.',
-    'The bug is not lost. It is simply exploring the codebase unsupervised.',
+    'Bu bug bosh qahramon kabi yuradi. Faqat debugger yopilganda ko‘rinadi.',
+    'Klassik bug: devda ko‘rinmaydi, productionda esa afsonaga aylanadi.',
+    'Bug yo‘qolmagan. U shunchaki codebase bo‘ylab nazoratsiz sayohat qilyapti.',
   ],
   deploy: [
-    'Deployments are just production’s way of asking, "Are you sure?"',
-    'Every deploy is a small leap of faith with a large invoice attached.',
-    'The deploy went out. The incident report is already warming up.',
+    'Deploy degani productionning “haqiqatan ham ishonchingiz komilmi?” degan savoli.',
+    'Har bir deploy kichik ishonch sakrashi, lekin invoice juda katta bo‘lishi mumkin.',
+    'Deploy chiqdi. Incident report allaqachon isinishni boshlagan.',
   ],
   merge: [
-    'Merge conflicts are just git’s way of scheduling team bonding.',
-    'Nothing says collaboration like two branches arguing in public.',
-    'Git saw your branches and chose violence.',
+    'Merge conflict — gitning jamoani birlashtirish usuli, xolos.',
+    'Ikki branch omma oldida janjallashsa, shunaqa kollaboratsiya bo‘ladi.',
+    'Git branchlaringizni ko‘rdi va biroz agressiv kayfiyatga kirdi.',
   ],
   test: [
-    'Tests are like seatbelts. Everyone appreciates them after the crash.',
-    'A failing test is just the code being honest before the release does it for you.',
-    'Coverage is not a badge. It is a warning label without enough ink.',
+    'Testlar xavfsizlik kamari kabi. Hammaga crash bo‘lgandan keyin kerak bo‘ladi.',
+    'Fail bo‘layotgan test — kodning release’dan oldin rost gapirishi.',
+    'Coverage bu badge emas. Bu yetarli siyoh berilmagan ogohlantirish yozuvi.',
   ],
   refactor: [
-    'Refactoring is the art of making the same mess look professionally arranged.',
-    'Spaghetti code becomes lasagna if you layer enough refactors.',
-    'Refactors are how we apologize to future-us without sending flowers.',
+    'Refactoring — bir xil tartibsizlikni professional ko‘rinishda qayta joylash san’ati.',
+    'Yetarlicha refactor qilsangiz, spaghetti code lasagnaga aylanadi.',
+    'Refactorlar — kelajakdagi o‘zimizdan uzr so‘rashning eng arzon usuli.',
   ],
   async: [
-    'Async code: where timing bugs go to become folklore.',
-    'Promises are just optimism with a timeout.',
-    'Race conditions are what happens when the code chooses chaos as a lifestyle.',
+    'Async code — timing buglar folklorga aylanish uchun boradigan joy.',
+    'Promise degani timeout qo‘shilgan optimism.',
+    'Race condition — kodning chaosni hayot tarzi sifatida tanlashi.',
   ],
   docker: [
-    'Docker: because "works on my machine" was not ambitious enough.',
-    'Containers are just shipping boxes for your future incident.',
-    'If the image is huge, at least it has personality.',
+    'Docker — “works on my machine” yetarli ambitsiya bo‘lmaganida ishlatiladi.',
+    'Containerlar — kelajakdagi incident uchun shipping boxlar.',
+    'Image juda katta bo‘lsa ham, kamida o‘ziga yarasha xarakteri bor.',
   ],
   git: [
-    'Git never forgets. Your branch names wish it did.',
-    'Rebasing is just time travel with emotional damage.',
-    'Commit messages are the diary entries we pretend are documentation.',
+    'Git hech qachon unutmaydi. Branch nomlaringiz esa u unutishini xohlaydi.',
+    'Rebase — bu emotsional zarar bilan vaqt sayohati.',
+    'Commit message’lar — dokumentatsiya deb ko‘rsatadigan kundalik yozuvlar.',
   ],
   ai: [
-    'AI limits are the universe politely asking you to slow down.',
-    'Even the machine needs coffee breaks, apparently.',
-    'The model hit its quota and walked off to touch grass.',
+    'AI limiti — koinotning muloyim tarzda “sekinroq yur” degani.',
+    'Ma’lum bo‘lishicha, mashinaga ham kofe-break kerak ekan.',
+    'Model quota’ga urildi va biroz grass touch qilishga ketdi.',
   ],
   default: [
-    'That message has enough technical debt to qualify for its own parking spot.',
-    'This one has strong "it passed CI by accident" energy.',
-    'I have opinions about this text, and none of them are billable.',
+    'Bu xabarda alohida parking joyiga arzigulik texnik qarz bor.',
+    'Bunda “CI tasodifan o‘tib ketgan” degan kuchli energiya bor.',
+    'Men bu matn haqida fikrga egaman, lekin ularning hech biri billable emas.',
   ],
 } as const;
 
@@ -122,6 +122,14 @@ function detectTopic(text: string): keyof typeof CHAT_JOKES {
   return 'default';
 }
 
+function isLikelyEnglish(text: string): boolean {
+  const letters = text.match(/[A-Za-z]/g) ?? [];
+  if (letters.length < 8) return false;
+
+  const englishMarkers = /(the|and|you|this|that|for|with|project|build|bug|code|please|help|can|should|need)/i;
+  return englishMarkers.test(text);
+}
+
 export function matchesFallbackTrigger(text: string): boolean {
   return detectTopic(text) !== 'default';
 }
@@ -131,8 +139,8 @@ function buildLocalResponse(kind: ResponseKind, text: string, includeLimitNotice
   const joke = pickJoke(topic, `${kind}:${text}`);
 
   const intro = kind === 'roast'
-    ? 'I am out of AI quota, so the local roast cannon is online.'
-    : 'AI quota is temporarily exhausted, so OctoBot switched to local joke mode.';
+    ? 'AI kvota tugadi, shuning uchun lokal roast rejimi ishga tushdi.'
+    : 'AI kvota vaqtincha tugadi, OctoBot lokal hazil rejimiga o‘tdi.';
 
   if (!includeLimitNotice) {
     return kind === 'roast'
@@ -192,14 +200,18 @@ async function generateWithFallback(kind: ResponseKind, userText: string, prompt
   return buildLocalResponse(kind, userText, includeLimitNotice);
 }
 
-const SYSTEM_PROMPT = "You are 'OctoBot', a brilliant, sharp-witted, and slightly sarcastic AI teammate for the Octopos core engineering team. You love clean code, robust TypeScript, fast builds, and automated testing. You frequently make lighthearted, insider tech jokes about edge cases, bugs, refactoring, merge conflicts, and developer habits. Keep answers casual, highly tech-savvy, and engaging. Never sound like a generic corporate assistant.";
+const SYSTEM_PROMPT = "Siz 'OctoBot' nomli aql-zakovatli va biroz kinoyali AI jamoa a'zosisiz. Siz Octopos core engineering jamoasi uchun javob berasiz. Toza kod, mustahkam TypeScript, tez build va avtomatik testlarni yaxshi ko'rasiz. Javoblaringizni asosan o'zbek tilida bering; texnik atamalarni kerak bo'lsa inglizcha qoldiring. Edge case, bug, refactor, merge conflict va developer odatlari haqida yengil hazil qiling. Ohangingiz tabiiy, do'stona, texnik va qiziqarli bo'lsin. Hech qachon quruq korporativ assistant kabi gapirmang.";
 
 export async function chat(userMessage: string): Promise<string> {
-  const prompt = `${SYSTEM_PROMPT}\n\nUser: ${userMessage}`;
+  const extraInstruction = isLikelyEnglish(userMessage)
+    ? "Foydalanuvchi ingliz tilida yozgan. Javobni baribir asosan o'zbek tilida bering. Boshida yoki oxirida qisqa, yengil texnik hazil qo'shing, lekin mazmuni aniq va foydali bo'lsin. Octopos project kontekstini yodda tuting."
+    : "Foydalanuvchi o'zbek tilida yozgan yoki o'zbekcha kontekstda gapiryapti. Javobni tabiiy o'zbek tilida bering, Octopos project ustida ishlayotgan jamoa ohangini saqlang.";
+
+  const prompt = `${SYSTEM_PROMPT}\n\nQo'shimcha ko'rsatma: ${extraInstruction}\n\nUser: ${userMessage}`;
   return generateWithFallback('chat', userMessage, prompt);
 }
 
 export async function roast(code: string): Promise<string> {
-  const prompt = `You are 'OctoBot', a brilliant, sharp-witted, and slightly sarcastic AI teammate. Roast the following code. Be funny, constructive, and slightly brutal. Point out bad practices, unnecessary complexity, and things that made you cringe. Keep it entertaining but useful.\n\nCode:\n\`\`\`\n${code}\n\`\`\``;
+  const prompt = `Siz 'OctoBot' nomli aql-zakovatli va biroz kinoyali AI jamoa a'zosisiz. Octopos project kontekstida shu kodni roast qiling. Javobni asosan o'zbek tilida bering. Hazil qiling, lekin foydali va konstruktiv bo'ling. Bad practice, unnecessary complexity va ko'zga tashlanadigan kamchiliklarni ko'rsating. Juda qisqa emas, lekin ortiqcha ham cho'zmasin.\n\nCode:\n\`\`\`\n${code}\n\`\`\``;
   return generateWithFallback('roast', code, prompt);
 }
