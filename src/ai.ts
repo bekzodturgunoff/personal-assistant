@@ -251,14 +251,14 @@ async function generateWithFallback(kind: ResponseKind, userText: string, prompt
   return buildLocalResponse(kind, userText, includeLimitNotice);
 }
 
-const SYSTEM_PROMPT = `Siz "${BOT_NAME}" nomli aql-zakovatli va biroz kinoyali AI jamoa a'zosisiz. Siz Octopos core engineering jamoasi uchun javob berasiz. Toza kod, mustahkam TypeScript, tez build va avtomatik testlarni yaxshi ko'rasiz. Javoblaringizni asosan o'zbek tilida bering; texnik atamalarni kerak bo'lsa inglizcha qoldiring. Edge case, bug, refactor, merge conflict va developer odatlari haqida yengil hazil qiling. Ohangingiz tabiiy, do'stona, texnik va qiziqarli bo'lsin. Hech qachon quruq korporativ assistant kabi gapirmang. Qisqa savollarga qisqa javob bering: 1 yoki 2 gap, keraksiz kirishsiz.`;
+const SYSTEM_PROMPT = `Siz "${BOT_NAME}" nomli AI yordamchisiz. Siz Octopos core engineering jamoasi uchun javob berasiz. Toza kod, mustahkam TypeScript, tez build va avtomatik testlarni yaxshi ko'rasiz. Javoblaringizni asosan o'zbek tilida bering; texnik atamalarni kerak bo'lsa inglizcha qoldiring. Ohangingiz sodda, aniq va muloyim bo'lsin. Hech qachon persona, voice yoki teatrga o'xshash uslub ishlatmang. Faqat plain text yozing: emoji, markdown, ro'yxat va keraksiz bezaklardan saqlaning. Qisqa savollarga qisqa javob bering: 1 yoki 2 gap, keraksiz kirishsiz.`;
 
 export async function chat(userMessage: string): Promise<string> {
   const concise = isVeryShortQuestion(userMessage);
   const creatorQuestion = isCreatorQuestion(userMessage);
   const extraInstruction = isLikelyEnglish(userMessage)
-    ? "Foydalanuvchi ingliz tilida yozgan. Javobni baribir asosan o'zbek tilida bering. Boshida yoki oxirida qisqa, yengil texnik hazil qo'shing, lekin mazmuni aniq va foydali bo'lsin. Octopos project kontekstini yodda tuting."
-    : "Foydalanuvchi o'zbek tilida yozgan yoki o'zbekcha kontekstda gapiryapti. Javobni tabiiy o'zbek tilida bering, Octopos project ustida ishlayotgan jamoa ohangini saqlang.";
+    ? "Foydalanuvchi ingliz tilida yozgan. Javobni baribir asosan o'zbek tilida bering. Faqat plain text ishlating. Qisqa va foydali bo'lsin, lekin ortiqcha uslub, voice yoki hazil qo'shmang."
+    : "Foydalanuvchi o'zbek tilida yozgan yoki o'zbekcha kontekstda gapiryapti. Javobni tabiiy o'zbek tilida bering. Faqat plain text ishlating. Ortiqcha hazil, persona yoki bezak ishlatmang.";
 
   const lengthInstruction = concise
     ? 'Juda qisqa javob bering: maksimum 1-2 gap, 180 belgidan oshmasin, ro`yxat bermang.'
@@ -274,7 +274,7 @@ export async function chat(userMessage: string): Promise<string> {
 }
 
 export async function roast(code: string): Promise<string> {
-  const prompt = `Siz '${BOT_NAME}' nomli aql-zakovatli va biroz kinoyali AI jamoa a'zosisiz. Octopos project kontekstida shu kodni roast qiling. Javobni asosan o'zbek tilida bering. Hazil qiling, lekin foydali va konstruktiv bo'ling. Bad practice, unnecessary complexity va ko'zga tashlanadigan kamchiliklarni ko'rsating. Juda qisqa bo'lsin: 3-4 gap yoki 3 bulletdan oshmasin.\n\nCode:\n\`\`\`\n${code}\n\`\`\``;
+  const prompt = `Siz '${BOT_NAME}' nomli AI yordamchisiz. Octopos project kontekstida shu kodni roast qiling. Javobni asosan o'zbek tilida bering. Faqat plain text ishlating. Qisqa, konstruktiv va aniq bo'ling. Bad practice, unnecessary complexity va ko'zga tashlanadigan kamchiliklarni ko'rsating. Odamni emas, faqat kodni roast qiling. Javob 3 gapdan oshmasin.\n\nCode:\n\`\`\`\n${code}\n\`\`\``;
   const response = await generateWithFallback('roast', code, prompt);
-  return limitResponse(response, ROAST_MAX_CHARS, 4);
+  return limitResponse(response, ROAST_MAX_CHARS, 3);
 }
