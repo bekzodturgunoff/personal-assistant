@@ -2,7 +2,15 @@ import { GoogleGenAI } from '@google/genai';
 import { config } from './config.js';
 import { getEnv } from './runtime-env.js';
 
-const ai = new GoogleGenAI({ apiKey: config.aiApiKey });
+let aiClient: GoogleGenAI | undefined;
+
+function getAiClient(): GoogleGenAI {
+  if (!aiClient) {
+    aiClient = new GoogleGenAI({ apiKey: config.aiApiKey });
+  }
+
+  return aiClient;
+}
 
 const PRIMARY_MODEL = getEnv('AI_MODEL') || 'gemini-2.5-flash';
 const FALLBACK_MODEL = getEnv('AI_FALLBACK_MODEL') || 'gemini-1.5-flash';
@@ -155,7 +163,7 @@ function buildLocalResponse(kind: ResponseKind, text: string, includeLimitNotice
 }
 
 async function generateContent(model: string, contents: string): Promise<string> {
-  const response = await ai.models.generateContent({
+  const response = await getAiClient().models.generateContent({
     model,
     contents,
   });
