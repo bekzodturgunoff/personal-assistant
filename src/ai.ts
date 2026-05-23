@@ -77,6 +77,46 @@ const CHAT_JOKES = {
 
 type ResponseKind = 'chat' | 'roast';
 
+const BOT_NAME = 'Octopos Agent';
+const CREATOR_INFO = 'Octopos developers (octopos.uz)';
+const DEFAULT_CHAT_MAX_CHARS = 420;
+const CONCISE_CHAT_MAX_CHARS = 180;
+const ROAST_MAX_CHARS = 320;
+
+function isVeryShortQuestion(text: string): boolean {
+  const compact = text.trim();
+  if (compact.length <= 20) return true;
+
+  const words = compact.split(/\s+/).filter(Boolean);
+  return words.length <= 4;
+}
+
+function isCreatorQuestion(text: string): boolean {
+  const lower = text.toLowerCase();
+  return /(?:who made you|who created you|creator|made you|built you|your creator|who developed you|kim yaratdi|kim qurgan|muallifing kim|seni kim yasadi|seni kim yaratdi)/i.test(lower);
+}
+
+function sentenceCount(text: string): number {
+  return (text.match(/[.!?۔]+/g) ?? []).length;
+}
+
+function limitResponse(text: string, maxChars: number, maxSentences: number): string {
+  const normalized = text
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (!normalized) return normalized;
+
+  const sentences = normalized.split(/(?<=[.!?۔])\s+/g);
+  const limitedSentences = sentences.slice(0, maxSentences).join(' ');
+  const clipped = limitedSentences.length > maxChars
+    ? `${limitedSentences.slice(0, maxChars).trimEnd()}…`
+    : limitedSentences;
+
+  return clipped;
+}
+
 function isQuotaOrRateLimitError(error: unknown): boolean {
   const candidate = error as { status?: unknown; code?: unknown; message?: unknown };
   const status = typeof candidate?.status === 'number' ? candidate.status : undefined;
@@ -211,18 +251,30 @@ async function generateWithFallback(kind: ResponseKind, userText: string, prompt
   return buildLocalResponse(kind, userText, includeLimitNotice);
 }
 
-const SYSTEM_PROMPT = "Siz 'OctoBot' nomli aql-zakovatli va biroz kinoyali AI jamoa a'zosisiz. Siz Octopos core engineering jamoasi uchun javob berasiz. Toza kod, mustahkam TypeScript, tez build va avtomatik testlarni yaxshi ko'rasiz. Javoblaringizni asosan o'zbek tilida bering; texnik atamalarni kerak bo'lsa inglizcha qoldiring. Edge case, bug, refactor, merge conflict va developer odatlari haqida yengil hazil qiling. Ohangingiz tabiiy, do'stona, texnik va qiziqarli bo'lsin. Hech qachon quruq korporativ assistant kabi gapirmang.";
+const SYSTEM_PROMPT = `Siz "${BOT_NAME}" nomli aql-zakovatli va biroz kinoyali AI jamoa a'zosisiz. Siz Octopos core engineering jamoasi uchun javob berasiz. Toza kod, mustahkam TypeScript, tez build va avtomatik testlarni yaxshi ko'rasiz. Javoblaringizni asosan o'zbek tilida bering; texnik atamalarni kerak bo'lsa inglizcha qoldiring. Edge case, bug, refactor, merge conflict va developer odatlari haqida yengil hazil qiling. Ohangingiz tabiiy, do'stona, texnik va qiziqarli bo'lsin. Hech qachon quruq korporativ assistant kabi gapirmang. Qisqa savollarga qisqa javob bering: 1 yoki 2 gap, keraksiz kirishsiz.`;
 
 export async function chat(userMessage: string): Promise<string> {
+  const concise = isVeryShortQuestion(userMessage);
+  const creatorQuestion = isCreatorQuestion(userMessage);
   const extraInstruction = isLikelyEnglish(userMessage)
     ? "Foydalanuvchi ingliz tilida yozgan. Javobni baribir asosan o'zbek tilida bering. Boshida yoki oxirida qisqa, yengil texnik hazil qo'shing, lekin mazmuni aniq va foydali bo'lsin. Octopos project kontekstini yodda tuting."
     : "Foydalanuvchi o'zbek tilida yozgan yoki o'zbekcha kontekstda gapiryapti. Javobni tabiiy o'zbek tilida bering, Octopos project ustida ishlayotgan jamoa ohangini saqlang.";
 
-  const prompt = `${SYSTEM_PROMPT}\n\nQo'shimcha ko'rsatma: ${extraInstruction}\n\nUser: ${userMessage}`;
-  return generateWithFallback('chat', userMessage, prompt);
+  const lengthInstruction = concise
+    ? 'Juda qisqa javob bering: maksimum 1-2 gap, 180 belgidan oshmasin, ro`yxat bermang.'
+    : 'Javobni qisqa va lo‘nda qiling: maksimum 3-4 gap, ortiqcha izoh va kirishsiz, 420 belgidan oshmasin.';
+
+  const creatorInstruction = creatorQuestion
+    ? `Agar foydalanuvchi sizni kim yaratganini so'rasa, qisqa va aniq javob bering: "Meni Octopos developers (octopos.uz) yaratgan." Keraksiz izoh bermang.`
+    : `Agar foydalanuvchi creator haqida so'ramagan bo'lsa, bu mavzuga kirmang.`;
+
+  const prompt = `${SYSTEM_PROMPT}\n\nQo'shimcha ko'rsatma: ${extraInstruction}\n${creatorInstruction}\n${lengthInstruction}\n\nCreator info: ${CREATOR_INFO}\n\nUser: ${userMessage}`;
+  const response = await generateWithFallback('chat', userMessage, prompt);
+  return limitResponse(response, concise ? CONCISE_CHAT_MAX_CHARS : DEFAULT_CHAT_MAX_CHARS, concise ? 2 : 4);
 }
 
 export async function roast(code: string): Promise<string> {
-  const prompt = `Siz 'OctoBot' nomli aql-zakovatli va biroz kinoyali AI jamoa a'zosisiz. Octopos project kontekstida shu kodni roast qiling. Javobni asosan o'zbek tilida bering. Hazil qiling, lekin foydali va konstruktiv bo'ling. Bad practice, unnecessary complexity va ko'zga tashlanadigan kamchiliklarni ko'rsating. Juda qisqa emas, lekin ortiqcha ham cho'zmasin.\n\nCode:\n\`\`\`\n${code}\n\`\`\``;
-  return generateWithFallback('roast', code, prompt);
+  const prompt = `Siz '${BOT_NAME}' nomli aql-zakovatli va biroz kinoyali AI jamoa a'zosisiz. Octopos project kontekstida shu kodni roast qiling. Javobni asosan o'zbek tilida bering. Hazil qiling, lekin foydali va konstruktiv bo'ling. Bad practice, unnecessary complexity va ko'zga tashlanadigan kamchiliklarni ko'rsating. Juda qisqa bo'lsin: 3-4 gap yoki 3 bulletdan oshmasin.\n\nCode:\n\`\`\`\n${code}\n\`\`\``;
+  const response = await generateWithFallback('roast', code, prompt);
+  return limitResponse(response, ROAST_MAX_CHARS, 4);
 }

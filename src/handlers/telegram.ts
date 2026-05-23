@@ -98,6 +98,11 @@ function shouldReplyToMessage(params: {
   return false;
 }
 
+function isPrivateCommandLike(text: string): boolean {
+  const lower = text.trim().toLowerCase();
+  return lower === '/start' || lower === '/help' || lower === '/roast' || lower === '/stop' || lower === '/mute' || lower === '/resume' || lower === '/unmute' || lower === '/quiet';
+}
+
 type ReplyContext = {
   reply: (text: string) => Promise<unknown>;
 };
@@ -126,14 +131,14 @@ export function setupTelegramHandlers(bot: Bot) {
   bot.command('start', async (ctx) => {
     const displayName = getDisplayName(ctx.from?.username);
     const greeting = displayName ? `${displayName}, ` : '';
-    await replySafe(ctx, `${greeting}OctoBot tayyor. Men kodni ko‘rib chiqaman, savollarga javob beraman va kerak bo‘lsa hazil ham qilaman. 🔥`);
+    await replySafe(ctx, `${greeting}Octopos Agent tayyor. Men kodni ko‘rib chiqaman, savollarga javob beraman va kerak bo‘lsa hazil ham qilaman. 🔥`);
   });
 
   bot.command('help', async (ctx) => {
     await replySafe(
       ctx,
       [
-        'OctoBot buyruqlari:',
+        'Octopos Agent buyruqlari:',
         '- /start — botni ishga tushirish',
         '- /help — yordam',
         '- /roast — reply qilingan kodni roast qilish',
@@ -192,6 +197,30 @@ export function setupTelegramHandlers(bot: Bot) {
       unmuteChat(ctx.chat.id);
       await replySafe(ctx, 'Yaxshi, qayta yoqildim.');
       return;
+    }
+
+    if (ctx.chat.type === 'private' && isPrivateCommandLike(text)) {
+      if (text === '/start') {
+        const displayName = getDisplayName(ctx.from?.username);
+        const greeting = displayName ? `${displayName}, ` : '';
+        await replySafe(ctx, `${greeting}Octopos Agent tayyor. Men kodni ko‘rib chiqaman, savollarga javob beraman va kerak bo‘lsa hazil ham qilaman. 🔥`);
+        return;
+      }
+
+      if (text === '/help') {
+        await replySafe(
+          ctx,
+          [
+            'Octopos Agent buyruqlari:',
+            '- /start — botni ishga tushirish',
+            '- /help — yordam',
+            '- /roast — reply qilingan kodni roast qilish',
+            '- /stop yoki /mute — shu chatda jim turish',
+            '- /resume yoki /unmute — qayta javob berishni yoqish',
+          ].join('\n'),
+        );
+        return;
+      }
     }
 
     if (chatMuted && !isMentioned && !isReplyToBot && !isKeywordTriggered) return;
