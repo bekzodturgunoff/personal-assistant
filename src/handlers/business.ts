@@ -1,11 +1,15 @@
 import type {Bot} from "grammy/web";
 import {config} from "../config.js";
-import {businessAssistantReply} from "../ai.js";
+import {businessAssistantReply} from "../prompts/business.js";
 import {addMessage, getRecentHistory} from "../conversation-memory.js";
+import {recordMessage, buildPersonaBlock} from "../persona-memory.js";
+import {extractAndStoreFact, getFactsBlock} from "../long-term-memory.js";
 
 type RawUpdate = Record<string, unknown>;
 
 const TG_API = "https://api.telegram.org/bot";
+
+let ownerChatId: number | null = null;
 
 function tgApiUrl(method: string): string {
   return `${TG_API}${config.telegramBotToken}/${method}`;
@@ -30,6 +34,7 @@ export async function handleBusinessUpdate(
     update.edited_business_message) as Record<string, unknown> | undefined;
 
   if (bc) {
+    ownerChatId = typeof bc.user_chat_id === "number" ? bc.user_chat_id : null;
     console.log(
       `[Business] Connection ${bc.is_enabled ? "enabled" : "disabled"} for user ${bc.user_chat_id}`,
     );
@@ -41,6 +46,17 @@ export async function handleBusinessUpdate(
   const text = typeof bm.text === "string" ? bm.text.trim() : "";
   if (!text) return;
 
+  const fromObj = bm.from as Record<string, unknown> | undefined;
+  const senderId = fromObj?.id as number | undefined;
+  const senderName = [fromObj?.first_name, fromObj?.last_name]
+    .filter(Boolean)
+    .join(" ") || fromObj?.username as string | undefined || "Someone";
+
+  if (senderId && senderId === ownerChatId) {
+    console.log(`[Business] Skipping own message from owner (${senderId})`);
+    return;
+  }
+
   const chatObj = bm.chat as Record<string, unknown> | undefined;
   const chatId = chatObj?.id as number | undefined;
   const connectionId = bm.business_connection_id as string | undefined;
@@ -48,8 +64,14 @@ export async function handleBusinessUpdate(
 
   if (!chatId || !connectionId || !messageId) return;
 
+  const shortText = text.toLowerCase().trim();
+  if (!shortText || /^(ok|lol|ha+)$/.test(shortText)) {
+    console.log(`[Business] Ignoring short/spam message: "${text}"`);
+    return;
+  }
+
   console.log(
-    `[Business] Message from chat ${chatId}: "${text.slice(0, 100)}"`,
+    `[Business] Message from ${senderName} (${chatId}): "${text.slice(0, 100)}"`,
   );
 
   try {
@@ -66,21 +88,33 @@ export async function handleBusinessUpdate(
     console.error("[Business] Failed to mark as read:", e);
   }
 
-  addMessage(chatId, "user", text);
+  await addMessage(chatId, "user", text);
+  await recordMessage(chatId, "user", text);
 
-  const history = getRecentHistory(chatId);
+  const history = await getRecentHistory(chatId);
   const isFirstContact = history.length <= 1;
+  const personaBlock = await buildPersonaBlock(chatId);
+  const longTermBlock = await getFactsBlock(chatId);
+  const fullContext = [personaBlock, longTermBlock].filter(Boolean).join("\n");
 
   let response: string;
   try {
-    response = await businessAssistantReply(text, isFirstContact, history);
+    response = await businessAssistantReply(
+      text,
+      isFirstContact,
+      history,
+      senderName,
+      fullContext,
+    );
   } catch (error) {
     console.error("[Business] AI error:", error);
     response =
       "Hi! Bekzod is currently not online. He will get back to you as soon as he's available.";
   }
 
-  addMessage(chatId, "assistant", response);
+  await addMessage(chatId, "assistant", response);
+  await recordMessage(chatId, "assistant", response);
+  await extractAndStoreFact(chatId, text, response);
 
   try {
     const res = await fetch(tgApiUrl("sendMessage"), {

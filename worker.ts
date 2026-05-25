@@ -2,6 +2,10 @@ import {webhookCallback} from "grammy/web";
 import {createBot} from "./src/bot.js";
 import {config} from "./src/config.js";
 import {setRuntimeEnv} from "./src/runtime-env.js";
+import {setKvBinding} from "./src/conversation-memory.js";
+import {setKvBinding as setPersonaKv} from "./src/persona-memory.js";
+import {setConversationsKv, setTasksKv, setLongTermKv} from "./src/lib/kv-store.js";
+import {handleMorningBriefing, checkDueTasks} from "./src/handlers/tasks.js";
 
 type RuntimeBindings = Record<string, unknown>;
 
@@ -285,9 +289,31 @@ function renderErrorResponse(error: unknown): Response {
 }
 
 export default {
+  async scheduled(_event: unknown, env: RuntimeBindings): Promise<void> {
+    setRuntimeEnv(env);
+    const conversations = (env as Record<string, unknown>).CONVERSATIONS as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
+    const tasks = (env as Record<string, unknown>).TASKS as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
+    const longTerm = (env as Record<string, unknown>).LONG_TERM_MEMORY as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
+    if (conversations) { setKvBinding(conversations); setPersonaKv(conversations); setConversationsKv(conversations); }
+    if (tasks) setTasksKv(tasks);
+    if (longTerm) setLongTermKv(longTerm);
+    await checkDueTasks();
+    await handleMorningBriefing();
+  },
+
   async fetch(request: Request, env: RuntimeBindings): Promise<Response> {
     try {
       setRuntimeEnv(env);
+      const conversations = (env as Record<string, unknown>).CONVERSATIONS as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
+      const tasks = (env as Record<string, unknown>).TASKS as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
+      const longTerm = (env as Record<string, unknown>).LONG_TERM_MEMORY as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
+      if (conversations) {
+        setKvBinding(conversations);
+        setPersonaKv(conversations);
+        setConversationsKv(conversations);
+      }
+      if (tasks) setTasksKv(tasks);
+      if (longTerm) setLongTermKv(longTerm);
       const bot = getBot();
       await ensureCommands(bot);
       const url = new URL(request.url);

@@ -26,4 +26,10 @@ export const config = {
   get githubWebhookSecret() {
     return getEnv("GITHUB_WEBHOOK_SECRET") || "";
   },
+  get searchApiKey() {
+    return getEnv("SEARCH_API_KEY") || "";
+  },
+  get ownerChatId() {
+    return getEnv("OWNER_CHAT_ID") || "";
+  },
 };

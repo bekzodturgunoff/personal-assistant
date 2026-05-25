@@ -1,3 +1,18 @@
 name = "octopos-bot"
 main = "worker.ts"
 compatibility_date = "2026-05-23"
+
+[triggers]
+crons = ["0 3 * * *"]
+
+[[kv_namespaces]]
+binding = "CONVERSATIONS"
+id = "b43cce2403b24eb990ac7e5ad791d5e2"
+
+[[kv_namespaces]]
+binding = "TASKS"
+id = "57141fdcf7e546ba8e587ce243901933"
+
+[[kv_namespaces]]
+binding = "LONG_TERM_MEMORY"
+id = "93be5b687227483abde218c0971a7cd8"
