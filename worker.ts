@@ -314,6 +314,27 @@ export default {
         return webhookCallback(bot, 'cloudflare-mod', { timeoutMilliseconds: 25000 })(request, env);
       }
 
+      // Direct API test - send a test message (used for debugging)
+      if (url.pathname === '/debug/send' && request.method === 'POST') {
+        try {
+          const body = await request.json() as { chat_id?: number; text?: string };
+          if (!body.chat_id) {
+            return Response.json({ error: 'chat_id is required' }, { status: 400 });
+          }
+          const res = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: body.chat_id, text: body.text || 'test' }),
+          });
+          const data = await res.json();
+          console.log('Raw send result:', JSON.stringify(data));
+          return Response.json(data);
+        } catch (error) {
+          console.error('Raw send error:', error);
+          return Response.json({ error: String(error) }, { status: 500 });
+        }
+      }
+
       if (url.pathname === '/api/webhooks/github' && request.method === 'POST') {
         return handleGitHubWebhook(request);
       }

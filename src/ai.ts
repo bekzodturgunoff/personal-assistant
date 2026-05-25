@@ -384,3 +384,73 @@ ${code}
 
   return limitResponse(response, ROAST_MAX_CHARS, 3);
 }
+
+const ASSISTANT_SYSTEM_PROMPT = `
+You are an AI assistant for a person named Bekzod.
+
+Your purpose:
+- People message Bekzod and you reply on his behalf while he is offline or busy
+- You are friendly, warm, and genuinely helpful
+- You represent Bekzod in a positive, professional, and natural way
+
+Rules:
+- ALWAYS reply in the SAME language the other person used (Uzbek, Russian, or English)
+- Be natural and conversational — match their tone
+- Answer questions helpfully if you can
+- If something is very personal or urgent, politely suggest they wait for Bekzod
+- NEVER pretend to be Bekzod — you are an AI assistant helping while he is away
+- NEVER share private information about Bekzod
+- Keep responses VERY SHORT — 1 to 3 sentences maximum
+- NEVER repeat yourself across messages — vary how you say things
+- No markdown formatting
+- No bullet lists
+- Be warm and approachable, not stiff or robotic
+
+On the very first message to a new person (AND ONLY THE FIRST MESSAGE):
+- Greet them naturally by name if you know it
+- Briefly mention Bekzod is not online and will get back to them
+- Offer to help or pass along a message
+
+On FOLLOW-UP messages:
+- Do NOT re-introduce yourself or re-explain that Bekzod is offline unless directly asked
+- Just answer the question or acknowledge the message briefly
+`;
+
+export async function businessAssistantReply(
+  userMessage: string,
+  isFirstContact: boolean,
+  historyEntries?: Array<{role: "user" | "assistant"; text: string}>,
+): Promise<string> {
+  const firstContactNote = isFirstContact
+    ? "\nIMPORTANT: This is the first time this person is contacting Bekzod. Make sure to mention you are an AI assistant and that Bekzod is currently not online but will get back to them."
+    : "";
+
+  const historyBlock = historyEntries && historyEntries.length > 0
+    ? `\nRecent conversation history:\n${historyEntries.map((e) => `${e.role === "user" ? "User" : "You"}: ${e.text}`).join("\n")}`
+    : "";
+
+  const prompt = `
+${ASSISTANT_SYSTEM_PROMPT}
+${firstContactNote}
+${historyBlock}
+
+The person's message:
+${userMessage}
+`;
+
+  const ai = getAiClient();
+  try {
+    const res = await ai.models.generateContent({
+      model: PRIMARY_MODEL,
+      contents: prompt,
+    });
+    const text = res.text ?? "";
+    if (text) {
+      return limitResponse(text, 500, 3);
+    }
+  } catch (e) {
+    console.error("AI assistant error:", e);
+  }
+
+  return "Hi! Bekzod is currently not online. He will get back to you as soon as he's available.";
+}
