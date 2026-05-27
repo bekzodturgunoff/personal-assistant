@@ -95,6 +95,7 @@ export function setupTelegramHandlers(bot: Bot) {
       await replySafe(ctx, response);
     } catch (error) {
       console.error(`[Router] DM AI error for ${senderName} (${chatId}):`, error);
+      await replySafe(ctx, "Hozir bandman, keyinroq javob beraman");
     }
   });
 }

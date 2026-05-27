@@ -113,7 +113,7 @@ export async function handleBusinessUpdate(
     );
   } catch (error) {
     console.error(`[Business] AI call FAILED for ${senderName} (${chatId}): "${text.slice(0, 80)}"`, error);
-    return;
+    response = "Hozir bandman, keyinroq javob beraman";
   }
 
   await addMessage(chatId, "assistant", response);
