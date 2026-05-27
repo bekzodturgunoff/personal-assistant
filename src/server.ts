@@ -4,7 +4,6 @@ import {webhookCallback} from "grammy/web";
 import {createBot} from "./bot.js";
 import {config} from "./config.js";
 import {getEnv} from "./runtime-env.js";
-import {createGitHubWebhookHandler} from "./handlers/github.js";
 
 dotenv.config();
 
@@ -27,18 +26,12 @@ async function main() {
   const bot = createBot();
   const webhookUrl = getEnv("WEBHOOK_URL");
   const commands = [
-    {command: "start", description: "Start OctoBot"},
+    {command: "start", description: "Start the bot"},
     {command: "help", description: "Show help"},
-    {command: "roast", description: "Roast replied code"},
-    {command: "stop", description: "Mute OctoBot in this chat"},
-    {command: "resume", description: "Re-enable OctoBot in this chat"},
+    {command: "tasks", description: "Show your tasks"},
+    {command: "remind", description: "Set a reminder"},
+    {command: "done", description: "Mark a task as done"},
   ] as const;
-
-  app.post(
-    "/api/webhooks/github",
-    express.raw({type: "application/json"}),
-    createGitHubWebhookHandler(bot),
-  );
 
   try {
     await Promise.all([

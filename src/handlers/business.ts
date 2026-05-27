@@ -71,7 +71,7 @@ export async function handleBusinessUpdate(
   }
 
   console.log(
-    `[Business] Message from ${senderName} (${chatId}): "${text.slice(0, 100)}"`,
+    `[Business] Message from ${senderName} (${chatId}): "${text.slice(0, 100)}" → routing to businessAssistantReply`,
   );
 
   try {
@@ -107,9 +107,8 @@ export async function handleBusinessUpdate(
       fullContext,
     );
   } catch (error) {
-    console.error("[Business] AI error:", error);
-    response =
-      "Hi! Bekzod is currently not online. He will get back to you as soon as he's available.";
+    console.error(`[Business] AI call FAILED for ${senderName} (${chatId}): "${text.slice(0, 80)}"`, error);
+    return;
   }
 
   await addMessage(chatId, "assistant", response);

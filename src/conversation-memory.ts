@@ -1,5 +1,5 @@
-const MAX_HISTORY = 20;
-const MAX_CONTEXT = 6;
+const MAX_HISTORY = 40;
+const MAX_CONTEXT = 15;
 
 interface Entry {
   role: "user" | "assistant";

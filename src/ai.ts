@@ -1,24 +1,10 @@
-// Re-exports for backward compatibility
-// All logic moved to src/lib/ and src/prompts/
+// Re-exports for the personal assistant
+// OctoBot barrel re-exports removed — only business assistant remains.
 
 export {
-  isVeryShortQuestion,
-  isCreatorQuestion,
-  randomPersonality,
   limitResponse,
   generateWithFallback,
 } from "./lib/gemini.js";
-
-export {
-  isLocalJokeModeActive,
-  matchesFallbackTrigger,
-} from "./lib/jokes.js";
-
-export {
-  chat,
-  commandResponse,
-  roast,
-} from "./prompts/octobot.js";
 
 export {
   businessAssistantReply,

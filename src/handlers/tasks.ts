@@ -100,7 +100,13 @@ Examples:
 Text: ${raw}
 `;
 
-  const result = await generateWithFallback("task", raw, prompt);
+  let result: string | null = null;
+  try {
+    result = await generateWithFallback("task", raw, prompt);
+  } catch (e) {
+    console.error("Task AI parse failed:", e);
+  }
+
   if (!result) {
     const tasks = await getTasks(userId);
     tasks.push({id: makeId(), text: raw, createdAt: Date.now(), dueAt: null, done: false, userId});

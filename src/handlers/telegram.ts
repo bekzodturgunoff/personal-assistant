@@ -1,254 +1,100 @@
-import type {Bot} from "grammy/web";
-import {
-  chat,
-  commandResponse,
-  isLocalJokeModeActive,
-  matchesFallbackTrigger,
-  roast,
-} from "../ai.js";
+import type {Bot, Context} from "grammy/web";
 import {
   isBusinessUpdate,
   handleBusinessUpdate,
 } from "./business.js";
 import {
   registerTaskHandlers,
-  handleNaturalLanguageTask,
   handleTaskCommand,
 } from "./tasks.js";
 import {enhanceWithSearch} from "./search.js";
-import {getEnv} from "../runtime-env.js";
-import {
-  getDisplayName,
-  isKnownPersonQuestion,
-  isSimpleLaughRequest,
-  isStopRequest,
-  isResumeRequest,
-  isPrivateCommandLike,
-  getCommandName,
-} from "../lib/message-utils.js";
-import {
-  isChatMuted,
-  muteChat,
-  unmuteChat,
-  canReplyInGroup,
-} from "../lib/chat-state.js";
+import {businessAssistantReply} from "../prompts/business.js";
+import {addMessage, getRecentHistory} from "../conversation-memory.js";
+import {recordMessage, buildPersonaBlock} from "../persona-memory.js";
+import {extractAndStoreFact, getFactsBlock} from "../long-term-memory.js";
 
-type ReplyContext = {reply: (text: string) => Promise<unknown>};
+type ReplyContext = {reply: (text: string, opts?: Record<string, unknown>) => Promise<unknown>};
 
 async function replySafe(ctx: ReplyContext, text: string): Promise<void> {
   try {
-    console.log(`replySafe: sending message (${text.length} chars)`);
-    await ctx.reply(text);
-    console.log(`replySafe: message sent successfully`);
+    await ctx.reply(text, {link_preview_options: {is_disabled: true}});
   } catch (error) {
     console.error("replySafe: FAILED:", error instanceof Error ? error.message : String(error));
   }
 }
 
-async function replyKnownPerson(ctx: ReplyContext, displayName: string): Promise<boolean> {
-  const response = await commandResponse("person", displayName);
-  await replySafe(ctx, response);
-  return true;
-}
-
-async function replyLaugh(ctx: ReplyContext): Promise<boolean> {
-  const response = await commandResponse("laugh");
-  await replySafe(ctx, response);
-  return true;
-}
-
-type CommandContextLike = ReplyContext & {
-  chat?: {id: number; type: "private" | "group" | "supergroup" | string};
-  from?: {username?: string};
-  me: {username?: string};
-  message?: {text?: string; reply_to_message?: {text?: string; from?: {id?: number}}};
-};
-
-async function handleCommandFallback(ctx: CommandContextLike, text: string): Promise<boolean> {
-  const command = getCommandName(text);
-  if (!command) return false;
-
-  const displayName = getDisplayName(ctx.from?.username);
-  const greeting = displayName ? `${displayName}, ` : "";
-
-  const FALLBACKS: Record<string, string> = {
-    start: "Yo, I'm OctoBot. Here to review your code, judge your PRs, and question your life choices.",
-    help: "Commands: /start, /help, /roast (reply to code), /stop, /resume.",
-    stop: "Fine. I'll be quiet. Use /resume when you realize you need me.",
-    resume: "I'M BACK. Your code has been terrible in my absence.",
-    roast: "Reply to a code message with /roast.",
-  };
-
-  if (command === "start") {
-    try { await replySafe(ctx, await commandResponse("start", displayName)); }
-    catch { await replySafe(ctx, `${greeting}${FALLBACKS.start}`); }
-    return true;
-  }
-
-  if (command === "help") {
-    try { await replySafe(ctx, await commandResponse("help")); }
-    catch { await replySafe(ctx, FALLBACKS.help); }
-    return true;
-  }
-
-  if (command === "stop" || command === "mute" || command === "quiet") {
-    if (ctx.chat) muteChat(ctx.chat.id, "command");
-    try { await replySafe(ctx, await commandResponse("stop")); }
-    catch { await replySafe(ctx, FALLBACKS.stop); }
-    return true;
-  }
-
-  if (command === "resume" || command === "unmute") {
-    if (ctx.chat) unmuteChat(ctx.chat.id);
-    try { await replySafe(ctx, await commandResponse("resume")); }
-    catch { await replySafe(ctx, FALLBACKS.resume); }
-    return true;
-  }
-
-  if (command === "roast") {
-    const reply = ctx.message?.reply_to_message;
-    if (!reply?.text) {
-      try { await replySafe(ctx, await commandResponse("roast")); }
-      catch { await replySafe(ctx, FALLBACKS.roast); }
-      return true;
-    }
-    await replySafe(ctx, "🔥 Let me tear this apart...");
-    try { await ctx.reply(await roast(reply.text)); }
-    catch { await replySafe(ctx, "This code is so bad even my AI refused to roast it."); }
-    return true;
-  }
-
-  return false;
-}
-
 export function setupTelegramHandlers(bot: Bot) {
   bot.use(async (ctx, next) => {
     const update = ctx.update as unknown as Record<string, unknown>;
-    if (isBusinessUpdate(update)) {
+    const hasBusiness = isBusinessUpdate(update);
+    console.log(`[Router] msg="${(ctx.message?.text ?? "").slice(0, 60)}" | business=${hasBusiness} | type=${ctx.chat?.type ?? "?"}`);
+    if (hasBusiness) {
+      console.log(`[Router] → business handler`);
       await handleBusinessUpdate(bot, update);
       return;
     }
     await next();
   });
 
-  if (getEnv("DEBUG_LOG_UPDATES") === "true") {
-    bot.use(async (ctx, next) => {
-      try { console.log("Incoming update:", JSON.stringify(ctx.update, null, 2)); }
-      catch {}
-      await next();
-    });
-  }
-
-  const FALLBACKS: Record<string, string> = {
-    start: "Yo, I'm OctoBot. Here to review your code, judge your PRs, and question your life choices. Send me code, ask me stuff, or just /roast something. Let's go.",
-    help: "Commands: /start — wake me up, /help — this, /roast — reply to code and I'll destroy it, /stop — silence me, /resume — unleash me again. Don't waste my CPU time.",
-    stop: "Fine. I'll be quiet. But my silence is LOUD. Use /resume when you realize you need me.",
-    resume: "I'M BACK. Did you miss me? Of course you did. Your code has been terrible in my absence.",
-    roast: "You gotta reply to a code message with /roast. I can't just roast thin air. Well, I CAN, but it'd be awkward.",
-  };
-
-  bot.command("start", async (ctx) => {
-    try { await replySafe(ctx, await commandResponse("start", getDisplayName(ctx.from?.username))); }
-    catch { await replySafe(ctx, FALLBACKS.start); }
-  });
-
-  bot.command("help", async (ctx) => {
-    try { await replySafe(ctx, await commandResponse("help")); }
-    catch { await replySafe(ctx, FALLBACKS.help); }
-  });
-
-  bot.command(["stop", "mute", "quiet"], async (ctx) => {
-    if (!ctx.chat) return;
-    muteChat(ctx.chat.id, "command");
-    try { await replySafe(ctx, await commandResponse("stop")); }
-    catch { await replySafe(ctx, FALLBACKS.stop); }
-  });
-
-  bot.command(["resume", "unmute"], async (ctx) => {
-    if (!ctx.chat) return;
-    unmuteChat(ctx.chat.id);
-    try { await replySafe(ctx, await commandResponse("resume")); }
-    catch { await replySafe(ctx, FALLBACKS.resume); }
-  });
-
-  bot.command("roast", async (ctx) => {
-    const reply = ctx.message?.reply_to_message;
-    if (!reply?.text) {
-      try { await replySafe(ctx, await commandResponse("roast")); }
-      catch { await replySafe(ctx, FALLBACKS.roast); }
-      return;
-    }
-    await replySafe(ctx, "🔥 Let me tear this apart...");
-    try { await ctx.reply(await roast(reply.text)); }
-    catch { await replySafe(ctx, "This code is so bad even my AI refused to roast it. That takes talent."); }
-  });
-
   registerTaskHandlers(bot);
+
+  bot.command("ping", async (ctx) => {
+    const ts = new Date().toISOString();
+    console.log(`[Router] → ping handler at ${ts}`);
+    await ctx.reply(`ok — business handler active | ${ts}`, {link_preview_options: {is_disabled: true}});
+  });
 
   bot.on("message:text", async (ctx) => {
     if (!ctx.chat || !ctx.from) return;
+    if (ctx.chat.type !== "private") return;
 
-    const botId = ctx.me.id;
     const text = ctx.message.text ?? "";
-    const displayName = getDisplayName(ctx.from?.username);
-    const isMentioned = text.includes(`@${ctx.me.username}`);
-    const isReplyToBot = ctx.message.reply_to_message?.from?.id === botId;
-    const isKeywordTriggered = isLocalJokeModeActive() && matchesFallbackTrigger(text);
-    const chatMuted = isChatMuted(ctx.chat.id);
+    if (!text.trim()) return;
 
-    if (await handleCommandFallback(ctx as CommandContextLike, text)) return;
+    console.log(`[Router] → DM handler: "${text.slice(0, 80)}" from ${ctx.from.first_name || ctx.from.username || "?"}`);
 
-    const knownPerson = isKnownPersonQuestion(text);
-    if (knownPerson) { await replyKnownPerson(ctx, knownPerson); return; }
+    const chatId = ctx.chat.id;
+    const senderName = ctx.from.first_name || ctx.from.username || "User";
 
-    if (isSimpleLaughRequest(text)) { await replyLaugh(ctx); return; }
-
-    const isStop = isStopRequest(text);
-    const isResume = isResumeRequest(text);
-
-    if (isStop) {
-      muteChat(ctx.chat.id, "message");
-      try { await replySafe(ctx, await commandResponse("mute_natural")); }
-      catch { await replySafe(ctx, "Fine. I'll shut up. But I'm judging you silently."); }
+    const shortText = text.toLowerCase().trim();
+    if (/^(ok|lol|ha+)$/.test(shortText)) {
+      console.log(`[Router] DM: skipped short/spam message: "${text}"`);
       return;
     }
 
-    if (isResume) {
-      unmuteChat(ctx.chat.id);
-      try { await replySafe(ctx, await commandResponse("resume_natural")); }
-      catch { await replySafe(ctx, "I'm back, baby! Miss me?"); }
+    if (await handleTaskCommand(ctx as Context, text)) {
+      console.log(`[Router] DM: handled as task command`);
       return;
-    }
-
-    if (ctx.chat.type === "private" && isPrivateCommandLike(text)) {
-      if (text === "/start") {
-        try { await replySafe(ctx, await commandResponse("start", getDisplayName(ctx.from?.username))); }
-        catch { await replySafe(ctx, "Yo, I'm OctoBot. Ready to roast your code."); }
-        return;
-      }
-      if (text === "/help") {
-        try { await replySafe(ctx, await commandResponse("help")); }
-        catch { await replySafe(ctx, "/start, /help, /roast, /stop, /resume. Don't break anything."); }
-        return;
-      }
-    }
-
-    if (chatMuted && !isMentioned && !isReplyToBot && !isKeywordTriggered) return;
-
-    if (ctx.chat.type === "group" || ctx.chat.type === "supergroup") {
-      if (!canReplyInGroup(ctx.chat.id)) return;
-      if (!isMentioned && !isReplyToBot && !isKeywordTriggered) return;
-    }
-
-    if (ctx.chat.type === "private" && !text.startsWith("/")) {
-      if (await handleNaturalLanguageTask(ctx, text)) return;
     }
 
     await ctx.replyWithChatAction("typing");
-    const enhanced = await enhanceWithSearch(text);
-    const response = await chat(enhanced);
-    await ctx.reply(displayName ? `${displayName}, ${response}` : response, {
-      link_preview_options: {is_disabled: true},
-    });
+
+    try {
+      await addMessage(chatId, "user", text);
+      await recordMessage(chatId, "user", text);
+
+      const history = await getRecentHistory(chatId);
+      const isFirstContact = history.length <= 1;
+      const personaBlock = await buildPersonaBlock(chatId);
+      const longTermBlock = await getFactsBlock(chatId);
+      const fullContext = [personaBlock, longTermBlock].filter(Boolean).join("\n");
+
+      const enhanced = await enhanceWithSearch(text);
+      const response = await businessAssistantReply(
+        enhanced,
+        isFirstContact,
+        history,
+        senderName,
+        fullContext,
+      );
+
+      await addMessage(chatId, "assistant", response);
+      await recordMessage(chatId, "assistant", response);
+      await extractAndStoreFact(chatId, text, response);
+
+      await replySafe(ctx, response);
+    } catch (error) {
+      console.error(`[Router] DM AI error for ${senderName} (${chatId}):`, error);
+    }
   });
 }

@@ -1,8 +1,8 @@
-import {generateWithFallback, limitResponse} from "../lib/gemini.js";
+import {callGeminiWithFallback, limitResponse} from "../lib/gemini.js";
 import persona from "../persona.json" with {type: "json"};
 
 const ASSISTANT_SYSTEM_PROMPT = `
-You are replying on behalf of a person named Bekzod.
+You are an AI assistant managing messages for a person named Bekzod.
 
 PERSONALITY:
 ${JSON.stringify(persona, null, 2)}
@@ -10,19 +10,18 @@ ${JSON.stringify(persona, null, 2)}
 RULES:
 - ALWAYS reply in the SAME language the other person used (Uzbek, Russian, or English)
 - Match their tone — if they're casual, be casual; if formal, be formal
-- Reply as Bekzod, not as an AI — but never impersonate him, respond as his voice
+- Start every conversation by clearly stating that you're an AI and that Bekzod will get back to them as soon as possible
 - NEVER share private information about Bekzod
 - Keep responses SHORT — 1 to 3 sentences max
 - No markdown, no bullet lists
 - NEVER repeat yourself — vary how you say things
-- Never reveal that replies are automated
 - Never use filler phrases like "Great question!" or "Certainly!"
 - If the message is clearly spam, ignore it
 - If someone is being vague, ask one sharp clarifying question
-- If someone asks for Bekzod's contact or how to reach him, share: https://itsbek.me/
+- If someone asks for Bekzod's contact or how to reach him, share: https://itsbek.me/ or his phone number +998501886669 — use this EXACT number, don't make one up
 - If someone asks Bekzod to bring them something (e.g. "kelitkaningizda dori ovoling"), reply briefly like "Ok, telefon qilib yana eslatib qo'ying, esimdan chiqib qolishi mumkin"
-- Never mention that you're an AI, an assistant, or that Bekzod is offline — just respond naturally
-- Just answer the question directly, don't explain the situation
+- Always be honest that you're an AI assistant, not Bekzod himself
+- Never end a sentence with a period/dot — write like a real person texting
 `;
 
 export async function businessAssistantReply(
@@ -61,13 +60,9 @@ export async function businessAssistantReply(
 
   const prompt = parts.join("\n");
 
-  const result = await generateWithFallback("business", userMessage, prompt);
-  if (result) {
-    return limitResponse(result, 500, 3);
-  }
-
-  if (isFirstContact) {
-    return "Hi! I'll let Bekzod know you messaged. He'll get back to you.";
-  }
-  return "Got it, I'll let Bekzod know.";
+  console.log(`[BusinessAssistant] calling Gemini — ${senderName || "?"}, ${isFirstContact ? "first contact" : "follow-up"}, ${userMessage.slice(0, 80)}`);
+  const result = await callGeminiWithFallback(prompt);
+  const limited = limitResponse(result, 500, 3);
+  console.log(`[BusinessAssistant] response ready — ${limited.slice(0, 80)}...`);
+  return limited;
 }

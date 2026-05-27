@@ -8,11 +8,14 @@ export interface KvStore {
 let conversationsKv: KvStore | null = null;
 let tasksKv: KvStore | null = null;
 let longTermKv: KvStore | null = null;
+let modelCooldownKv: KvStore | null = null;
 
 export function setConversationsKv(kv: KvStore): void { conversationsKv = kv; }
 export function setTasksKv(kv: KvStore): void { tasksKv = kv; }
 export function setLongTermKv(kv: KvStore): void { longTermKv = kv; }
+export function setModelCooldownKv(kv: KvStore): void { modelCooldownKv = kv; }
 
 export function getConversationsKv(): KvStore | null { return conversationsKv; }
 export function getTasksKv(): KvStore | null { return tasksKv; }
 export function getLongTermKv(): KvStore | null { return longTermKv; }
+export function getModelCooldownKv(): KvStore | null { return modelCooldownKv; }
