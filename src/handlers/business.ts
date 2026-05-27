@@ -52,6 +52,11 @@ export async function handleBusinessUpdate(
     .filter(Boolean)
     .join(" ") || fromObj?.username as string | undefined || "Someone";
 
+  if (fromObj?.is_bot === true) {
+    console.log(`[Business] Skipping message from bot (${senderId})`);
+    return;
+  }
+
   if (senderId && senderId === ownerChatId) {
     console.log(`[Business] Skipping own message from owner (${senderId})`);
     return;
