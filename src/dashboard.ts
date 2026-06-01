@@ -2500,7 +2500,7 @@ function statCard(label, value, color) {
 }
 
 function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-function onEsc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\\\\/g,"\\\\\\\\").replace(/'/g,"\\\\u0027"); }
+function onEsc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\\\\/g,"\\\\\\\\").replace(/'/g,"\\u0027"); }
 
 let toastTimer;
 

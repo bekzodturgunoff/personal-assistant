@@ -50,9 +50,9 @@ export const config = {
     return n;
   },
   get dashboardUsername(): string {
-    return getEnv("DASHBOARD_USERNAME") || "";
+    return getEnv("DASHBOARD_USERNAME") || "admin";
   },
   get dashboardPassword(): string {
-    return getEnv("DASHBOARD_PASSWORD") || "";
+    return getEnv("DASHBOARD_PASSWORD") || "mac21012990";
   },
 };
