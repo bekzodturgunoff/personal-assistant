@@ -1619,7 +1619,7 @@ function renderConversations() {
   el.innerHTML = filtered.map(c => {
     const stage = c.relationshipStage || "stranger";
     const stageColor = stage === "regular" ? "#4ade80" : stage === "warm_lead" ? "#facc15" : stage === "acquaintance" ? "#60a5fa" : "#64748b";
-    return '<div class="conv-row" onclick="selectConversation(\'' + esc(c.chatId) + '\')" style="padding:10px;border-bottom:1px solid #1e293b;cursor:pointer;' + (c.muted ? 'opacity:0.5;' : '') + '">' +
+    return '<div class="conv-row" onclick="selectConversation(\'' + onEsc(c.chatId) + '\')" style="padding:10px;border-bottom:1px solid #1e293b;cursor:pointer;' + (c.muted ? 'opacity:0.5;' : '') + '">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;">' +
         '<code style="color:#93c5fd;font-size:0.8rem;">#' + esc(c.chatId) + '</code>' +
         '<div style="display:flex;gap:4px;align-items:center;">' +
@@ -1666,23 +1666,23 @@ async function selectConversation(chatId) {
   el.innerHTML =
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
       '<code style="color:#93c5fd;font-size:1rem;">#' + esc(chatId) + '</code>' +
-      '<button class="btn sm" onclick="toggleMute(\'' + esc(chatId) + '\')" id="mute-btn-' + chatId + '">' + (meta.muted ? 'Unmute' : 'Mute') + '</button>' +
-      '<button class="btn sm primary" onclick="showInjectModal(\'' + esc(chatId) + '\')">Inject reply</button>' +
-      '<button class="btn sm" onclick="cancelPending(\'' + esc(chatId) + '\')">Cancel pending</button>' +
-      '<button class="btn sm" onclick="runBrainNow(\'' + esc(chatId) + '\')">Run brain</button>' +
-      '<button class="btn sm danger" onclick="resetBrain(\'' + esc(chatId) + '\')">Reset brain</button>' +
+      '<button class="btn sm" onclick="toggleMute(\'' + onEsc(chatId) + '\')" id="mute-btn-' + chatId + '">' + (meta.muted ? 'Unmute' : 'Mute') + '</button>' +
+      '<button class="btn sm primary" onclick="showInjectModal(\'' + onEsc(chatId) + '\')">Inject reply</button>' +
+      '<button class="btn sm" onclick="cancelPending(\'' + onEsc(chatId) + '\')">Cancel pending</button>' +
+      '<button class="btn sm" onclick="runBrainNow(\'' + onEsc(chatId) + '\')">Run brain</button>' +
+      '<button class="btn sm danger" onclick="resetBrain(\'' + onEsc(chatId) + '\')">Reset brain</button>' +
     '</div>' +
     '<div class="card" style="padding:12px;margin-bottom:12px;">' +
       '<h3 style="font-size:0.9rem;color:#94a3b8;margin-bottom:8px;">Brain Analysis</h3>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:0.8rem;">' +
-        '<div><label style="color:#64748b;">Intent</label><select onchange="patchBrainMeta(\'' + esc(chatId) + '\',\'intent\',this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;">' + intentOptions.map(o => '<option value="' + o + '"' + (brain.intent === o ? ' selected' : '') + '>' + o + '</option>').join("") + '</select></div>' +
-        '<div><label style="color:#64748b;">Sentiment</label><select onchange="patchBrainMeta(\'' + esc(chatId) + '\',\'sentiment\',this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;">' + sentimentOptions.map(o => '<option value="' + o + '"' + (brain.sentiment === o ? ' selected' : '') + '>' + o + '</option>').join("") + '</select></div>' +
-        '<div><label style="color:#64748b;">Urgency</label><select onchange="patchBrainMeta(\'' + esc(chatId) + '\',\'urgency\',this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;">' + urgencyOptions.map(o => '<option value="' + o + '"' + (brain.urgency === o ? ' selected' : '') + '>' + o + '</option>').join("") + '</select></div>' +
-        '<div><label style="color:#64748b;">Stage</label><select onchange="patchBrainMeta(\'' + esc(chatId) + '\',\'relationship_stage\',this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;">' + stageOptions.map(o => '<option value="' + o + '"' + (brain.relationship_stage === o ? ' selected' : '') + '>' + o + '</option>').join("") + '</select></div>' +
-        '<div><label style="color:#64748b;">Language</label><select onchange="patchBrainMeta(\'' + esc(chatId) + '\',\'forcedLanguage\',this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;">' + langOptions.map(o => '<option value="' + o + '"' + ((meta.forcedLanguage || "") === o ? ' selected' : '') + '>' + (o || "auto") + '</option>').join("") + '</select></div>' +
-        '<div><label style="color:#64748b;">Confidence</label><input type="number" value="' + (brain.lastConfidence ?? 1) + '" min="0" max="1" step="0.01" onchange="patchBrainField(\'' + esc(chatId) + '\',\'lastConfidence\',parseFloat(this.value))" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;" /></div>' +
+        '<div><label style="color:#64748b;">Intent</label><select onchange="patchBrainMeta(\'' + onEsc(chatId) + '\',\'intent\',this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;">' + intentOptions.map(o => '<option value="' + o + '"' + (brain.intent === o ? ' selected' : '') + '>' + o + '</option>').join("") + '</select></div>' +
+        '<div><label style="color:#64748b;">Sentiment</label><select onchange="patchBrainMeta(\'' + onEsc(chatId) + '\',\'sentiment\',this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;">' + sentimentOptions.map(o => '<option value="' + o + '"' + (brain.sentiment === o ? ' selected' : '') + '>' + o + '</option>').join("") + '</select></div>' +
+        '<div><label style="color:#64748b;">Urgency</label><select onchange="patchBrainMeta(\'' + onEsc(chatId) + '\',\'urgency\',this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;">' + urgencyOptions.map(o => '<option value="' + o + '"' + (brain.urgency === o ? ' selected' : '') + '>' + o + '</option>').join("") + '</select></div>' +
+        '<div><label style="color:#64748b;">Stage</label><select onchange="patchBrainMeta(\'' + onEsc(chatId) + '\',\'relationship_stage\',this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;">' + stageOptions.map(o => '<option value="' + o + '"' + (brain.relationship_stage === o ? ' selected' : '') + '>' + o + '</option>').join("") + '</select></div>' +
+        '<div><label style="color:#64748b;">Language</label><select onchange="patchBrainMeta(\'' + onEsc(chatId) + '\',\'forcedLanguage\',this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;">' + langOptions.map(o => '<option value="' + o + '"' + ((meta.forcedLanguage || "") === o ? ' selected' : '') + '>' + (o || "auto") + '</option>').join("") + '</select></div>' +
+        '<div><label style="color:#64748b;">Confidence</label><input type="number" value="' + (brain.lastConfidence ?? 1) + '" min="0" max="1" step="0.01" onchange="patchBrainField(\'' + onEsc(chatId) + '\',\'lastConfidence\',parseFloat(this.value))" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;" /></div>' +
       '</div>' +
-      (brain.persona_notes ? '<div style="margin-top:8px;"><label style="color:#64748b;font-size:0.8rem;">Persona notes</label><textarea rows="2" onchange="patchBrainField(\'' + esc(chatId) + '\',\'persona_notes\',this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;font-family:monospace;">' + esc(brain.persona_notes) + '</textarea></div>' : '') +
+      (brain.persona_notes ? '<div style="margin-top:8px;"><label style="color:#64748b;font-size:0.8rem;">Persona notes</label><textarea rows="2" onchange="patchBrainField(\'' + onEsc(chatId) + '\',\'persona_notes\',this.value)" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-size:0.8rem;font-family:monospace;">' + esc(brain.persona_notes) + '</textarea></div>' : '') +
     '</div>' +
     '<div class="card" style="padding:12px;">' +
       '<h3 style="font-size:0.9rem;color:#94a3b8;margin-bottom:8px;">Conversation History (' + entries.length + ' messages)</h3>' +
@@ -1723,7 +1723,7 @@ function showInjectModal(chatId) {
       '<h3 style="margin-bottom:12px;">Inject Reply to #' + esc(chatId) + '</h3>' +
       '<textarea id="inject-text" rows="4" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:0.875rem;font-family:monospace;resize:vertical;" placeholder="Type reply..."></textarea>' +
       '<div style="display:flex;gap:8px;margin-top:12px;">' +
-        '<button class="btn primary" onclick="doInject(\'' + esc(chatId) + '\')">Send</button>' +
+        '<button class="btn primary" onclick="doInject(\'' + onEsc(chatId) + '\')">Send</button>' +
         '<button class="btn" onclick="document.getElementById(\'inject-modal\').remove()">Cancel</button>' +
       '</div>' +
     '</div>';
@@ -1798,7 +1798,7 @@ function renderFlaggedContacts() {
       '<code style="color:#93c5fd;">#' + esc(c.chatId) + '</code>' +
       '<span style="flex:1;color:#94a3b8;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc((c.lastMessage || "").slice(0, 40)) + '</span>' +
       '<span style="background:#f87171;color:#fff;padding:1px 6px;border-radius:4px;font-size:0.65rem;">' + esc(c.urgency) + '</span>' +
-      '<button class="btn sm" onclick="selectConversation(\'' + esc(c.chatId) + '\');switchTab(\'conversations\')">View</button>' +
+      '<button class="btn sm" onclick="selectConversation(\'' + onEsc(c.chatId) + '\');switchTab(\'conversations\')">View</button>' +
     '</div>'
   ).join("");
 }
@@ -1840,7 +1840,7 @@ async function loadBrainTab() {
     const tbody = document.getElementById("brain-lowconf-table");
     if (lc.length === 0) { tbody.innerHTML = '<tr><td colspan="4" style="color:#64748b;text-align:center;">No low-confidence contacts</td></tr>'; return; }
     tbody.innerHTML = lc.map(c =>
-      '<tr><td><code style="color:#93c5fd;">#' + esc(c.chatId) + '</code></td><td style="color:#f87171;">' + (c.lastConfidence || 0).toFixed(2) + '</td><td style="color:#94a3b8;font-size:0.8rem;">' + esc((c.personaNotes || "").slice(0, 40)) + '</td><td><button class="btn sm" onclick="runBrainNow(\'' + esc(c.chatId) + '\')">Run brain</button></td></tr>'
+      '<tr><td><code style="color:#93c5fd;">#' + esc(c.chatId) + '</code></td><td style="color:#f87171;">' + (c.lastConfidence || 0).toFixed(2) + '</td><td style="color:#94a3b8;font-size:0.8rem;">' + esc((c.personaNotes || "").slice(0, 40)) + '</td><td><button class="btn sm" onclick="runBrainNow(\'' + onEsc(c.chatId) + '\')">Run brain</button></td></tr>'
     ).join("");
   }
 }
@@ -1897,9 +1897,9 @@ async function loadBrainEditor() {
     '<div style="margin-top:8px;"><label style="color:#64748b;font-size:0.8rem;">Persona Notes</label><textarea id="be-notes" rows="2" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-family:monospace;">' + esc(output.persona_notes || "") + '</textarea></div>' +
     '<div style="margin-top:8px;"><label style="color:#64748b;font-size:0.8rem;">Summary</label><textarea id="be-summary" rows="3" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:#e2e8f0;font-family:monospace;">' + esc(data.summary || "") + '</textarea></div>' +
     '<div style="display:flex;gap:8px;margin-top:12px;">' +
-      '<button class="btn primary" onclick="saveBrainEditor(\'' + esc(chatId) + '\')">Save Changes</button>' +
-      '<button class="btn" onclick="runBrainNow(\'' + esc(chatId) + '\')">Run Brain Now</button>' +
-      '<button class="btn danger" onclick="resetBrain(\'' + esc(chatId) + '\')">Reset Brain</button>' +
+      '<button class="btn primary" onclick="saveBrainEditor(\'' + onEsc(chatId) + '\')">Save Changes</button>' +
+      '<button class="btn" onclick="runBrainNow(\'' + onEsc(chatId) + '\')">Run Brain Now</button>' +
+      '<button class="btn danger" onclick="resetBrain(\'' + onEsc(chatId) + '\')">Reset Brain</button>' +
     '</div>';
 }
 
@@ -1954,9 +1954,9 @@ function renderCommandList() {
     '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #1e293b;">' +
       '<code style="background:#0f172a;padding:2px 8px;border-radius:4px;color:#93c5fd;">/' + esc(c.name) + '</code>' +
       '<span style="flex:1;color:#94a3b8;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(c.description) + '</span>' +
-      '<label style="position:relative;display:inline-block;width:36px;height:20px;"><input type="checkbox" ' + (c.enabled ? 'checked' : '') + ' onchange="toggleCommand(\'' + esc(c.id) + '\',this.checked)" style="opacity:0;width:0;height:0;"><span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:' + (c.enabled ? '#3b82f6' : '#475569') + ';border-radius:20px;transition:0.3s;"></span></label>' +
-      '<button class="btn sm" onclick="editCommand(\'' + esc(c.id) + '\')">Edit</button>' +
-      '<span style="cursor:pointer;color:#ef4444;font-size:0.8rem;" onclick="deleteCommand(\'' + esc(c.id) + '\')">✕</span>' +
+      '<label style="position:relative;display:inline-block;width:36px;height:20px;"><input type="checkbox" ' + (c.enabled ? 'checked' : '') + ' onchange="toggleCommand(\'' + onEsc(c.id) + '\',this.checked)" style="opacity:0;width:0;height:0;"><span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:' + (c.enabled ? '#3b82f6' : '#475569') + ';border-radius:20px;transition:0.3s;"></span></label>' +
+      '<button class="btn sm" onclick="editCommand(\'' + onEsc(c.id) + '\')">Edit</button>' +
+      '<span style="cursor:pointer;color:#ef4444;font-size:0.8rem;" onclick="deleteCommand(\'' + onEsc(c.id) + '\')">✕</span>' +
     '</div>'
   ).join("");
 }
@@ -2204,7 +2204,7 @@ async function loadModelCooldowns() {
       return '<div style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:0.8rem;">' +
         '<span style="color:#f87171;">' + esc(c.model) + '</span>' +
         '<span style="color:#94a3b8;">Cooldown expires in ' + hours + 'h ' + mins + 'm</span>' +
-        '<button class="btn sm" onclick="clearCooldown(\'' + esc(c.model) + '\')">Clear</button>' +
+        '<button class="btn sm" onclick="clearCooldown(\'' + onEsc(c.model) + '\')">Clear</button>' +
       '</div>';
     }).join("");
 }
@@ -2499,7 +2499,8 @@ function statCard(label, value, color) {
   return '<div class="stat"><div class="stat-label">' + esc(label) + '</div><div class="stat-value ' + color + '">' + value + '</div></div>';
 }
 
-function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;").replace(/\\/g,"\\\\"); }
+function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function onEsc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\\\\/g,"\\\\\\\\").replace(/'/g,"\\\\u0027"); }
 
 let toastTimer;
 
