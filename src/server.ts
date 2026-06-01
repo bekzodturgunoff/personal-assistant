@@ -4,12 +4,40 @@ import {webhookCallback} from "grammy/web";
 import {createBot, registerPublicCommands} from "./bot.js";
 import {config} from "./config.js";
 import {getEnv} from "./runtime-env.js";
+import {handleDashboardApi, renderDashboardPage} from "./dashboard.js";
 
 dotenv.config();
 
 const app = express();
 
 app.get("/health", (_req, res) => res.json({ok: true}));
+
+app.use("/api/dashboard", express.text(), async (req, res, next) => {
+  const user = config.dashboardUsername;
+  const pw = config.dashboardPassword;
+  if (!user || !pw) {
+    res.status(404).type("text/plain").send("Dashboard disabled. Set DASHBOARD_USERNAME and DASHBOARD_PASSWORD.");
+    return;
+  }
+  if (req.path === "/" || req.path === "") {
+    const html = await renderDashboardPage();
+    res.type("html").send(html);
+    return;
+  }
+  const auth = req.headers.authorization || "";
+  const token = auth.replace(/^Bearer\s+/i, "");
+  if (token !== `${user}:${pw}`) {
+    res.status(401).send("Unauthorized");
+    return;
+  }
+  const body = ["PUT", "POST"].includes(req.method) ? req.body : null;
+  const result = await handleDashboardApi(req.path, req.method, body);
+  if (result) {
+    res.status(result.status).set(Object.fromEntries(result.headers)).send(await result.text());
+  } else {
+    res.status(404).send("Not found");
+  }
+});
 
 async function main() {
   const telegramToken = getEnv("TELEGRAM_BOT_TOKEN");

@@ -15,9 +15,7 @@ compatibility_date = "2026-05-23"
 # DASHBOARD_USERNAME   — Username for the web dashboard at /api/dashboard
 # DASHBOARD_PASSWORD   — Password for the web dashboard at /api/dashboard
 
-[vars]
-DASHBOARD_USERNAME = "admin"
-DASHBOARD_PASSWORD = "mac21012990"
+# Secrets set via `wrangler secret put` (not in this file)
 #
 # ── KV namespace usage ──
 # CONVERSATIONS namespace:
