@@ -1,5 +1,5 @@
 import type {Bot, Context} from "grammy/web";
-import {getTasksKv, getConversationsKv, getWeeklyAccumulator, resetWeeklyAccumulator} from "../lib/kv-store.js";
+import {getTasksKv, getConversationsKv, getWeeklyAccumulator, saveWeeklyAccumulator, resetWeeklyAccumulator} from "../lib/kv-store.js";
 import {generateWithFallback} from "../lib/gemini.js";
 import {config} from "../config.js";
 
@@ -255,6 +255,10 @@ export async function handleMorningBriefing(): Promise<void> {
 
   msg += "\n\nLet's get it done. 🚀";
 
+  const dailyAcc = await getWeeklyAccumulator();
+  dailyAcc.lastDailyCronAt = new Date().toISOString();
+  await saveWeeklyAccumulator(dailyAcc);
+
   try {
     await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
       method: "POST",
@@ -273,6 +277,10 @@ export async function handleWeeklyAnalytics(): Promise<void> {
 
   const stats = await computeWeeklyStats();
   const msg = `${stats}\n\nHave a great week! 🚀`;
+
+  const weeklyAcc = await getWeeklyAccumulator();
+  weeklyAcc.lastWeeklyCronAt = new Date().toISOString();
+  await saveWeeklyAccumulator(weeklyAcc);
 
   try {
     await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {

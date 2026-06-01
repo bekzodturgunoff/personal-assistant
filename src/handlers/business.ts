@@ -24,6 +24,7 @@ import {
   updateUserMeta,
   getWeeklyAccumulator,
   saveWeeklyAccumulator,
+  touchDailyEntry,
   getPausedUntil,
   clearPausedUntil,
 } from "../lib/kv-store.js";
@@ -482,6 +483,9 @@ export async function handleBusinessUpdate(
       acc.conversationsSeen.push(cid);
     }
     acc.chatMessages[cid] = (acc.chatMessages[cid] || 0) + 1;
+    const lang = intent.detectedLanguage as keyof typeof acc.languageBreakdown;
+    if (lang in acc.languageBreakdown) acc.languageBreakdown[lang]++;
+    touchDailyEntry(acc, 1, 0);
     await saveWeeklyAccumulator(acc);
   }
 }

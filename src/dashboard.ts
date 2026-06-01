@@ -1,6 +1,11 @@
 import {getUsageStats, resetUsageStats} from "./lib/usage-stats.js";
 import {getGeminiModels, setGeminiModels, getGroqModels, setGroqModels, DEFAULT_GEMINI_MODELS, DEFAULT_GROQ_CHAT_MODELS, DEFAULT_GROQ_JSON_MODELS} from "./lib/model-config.js";
-import {getWeeklyAccumulator} from "./lib/kv-store.js";
+import {getWeeklyAccumulator, saveWeeklyAccumulator, getUserMeta, getLongTermKv, getConversationsKv, getModelCooldownKv, deleteLongTermKey, deleteConversationsKey, setPausedUntil, clearPausedUntil} from "./lib/kv-store.js";
+import {getPersona} from "./persona-memory.js";
+import {getConversationSummary, getBrainOutput, runBrainAnalysis} from "./brain/brain.js";
+import type {UserMeta} from "./lib/kv-store.js";
+import {getBotSettings, saveBotSettings, getDefaultSettings} from "./lib/bot-settings.js";
+import type {BotSettings} from "./lib/bot-settings.js";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data, null, 2), {
@@ -9,8 +14,29 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
+async function getContactName(chatId: string): Promise<string> {
+  try {
+    const persona = await getPersona(Number(chatId));
+    if (persona && persona.messageCount > 0) return `Chat ${chatId}`;
+  } catch { /* ignore */ }
+  return chatId;
+}
+
+function relativeTime(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
 export async function handleDashboardApi(pathname: string, method: string, body: string | null): Promise<Response | null> {
   try {
+    // ── Existing endpoints ──
     if (pathname === "/api/dashboard/data" && method === "GET") {
       return getDashboardData();
     }
@@ -47,12 +73,277 @@ export async function handleDashboardApi(pathname: string, method: string, body:
       await setGroqModels({chatModels: DEFAULT_GROQ_CHAT_MODELS, jsonModels: DEFAULT_GROQ_JSON_MODELS});
       return json({ok: true, chatModels: DEFAULT_GROQ_CHAT_MODELS, jsonModels: DEFAULT_GROQ_JSON_MODELS});
     }
+
+    // ── New: GET /api/dashboard/conversations ──
+    if (pathname === "/api/dashboard/conversations" && method === "GET") {
+      return getConversationsList();
+    }
+
+    // ── New: GET /api/dashboard/pending ──
+    if (pathname === "/api/dashboard/pending" && method === "GET") {
+      return getPendingQuestionsList();
+    }
+
+    // ── New: GET /api/dashboard/queue ──
+    if (pathname === "/api/dashboard/queue" && method === "GET") {
+      return getReplyQueue();
+    }
+
+    // ── New: GET /api/dashboard/health ──
+    if (pathname === "/api/dashboard/health" && method === "GET") {
+      return getHealthStatus();
+    }
+
+    // ── New: POST /api/dashboard/conversations/:chatId/action ──
+    const actionMatch = pathname.match(/^\/api\/dashboard\/conversations\/(\d+)\/action$/);
+    if (actionMatch && method === "POST") {
+      if (!body) return json({error: "no body"}, 400);
+      return handleConversationAction(actionMatch[1], body);
+    }
+
+    // ── Bot settings ──
+    if (pathname === "/api/dashboard/settings" && method === "GET") {
+      const settings = await getBotSettings();
+      return json(settings);
+    }
+
+    if (pathname === "/api/dashboard/settings" && method === "PUT") {
+      if (!body) return json({error: "no body"}, 400);
+      const partial = JSON.parse(body) as Partial<BotSettings>;
+      const current = await getBotSettings();
+      const merged = {...current, ...partial};
+      await saveBotSettings(merged);
+      return json({ok: true, settings: merged});
+    }
+
+    if (pathname === "/api/dashboard/settings/reset" && method === "POST") {
+      await saveBotSettings(getDefaultSettings());
+      return json({ok: true});
+    }
+
     return null;
   } catch (e) {
     return json({error: String(e)}, 500);
   }
 }
 
+// ── New: conversations list ──
+async function getConversationsList(): Promise<Response> {
+  const kv = getLongTermKv();
+  if (!kv || !kv.list) return json([]);
+
+  const result = await kv.list({prefix: "meta:"});
+  const limit = 50;
+  const slice = result.keys.slice(0, limit);
+
+  const list = await Promise.all(slice.map(async (key) => {
+    const chatId = key.name.replace("meta:", "");
+    try {
+      const raw = await kv.get(key.name);
+      if (!raw) return null;
+      const meta = JSON.parse(raw) as UserMeta;
+
+      const convKv = getConversationsKv();
+      let brainSummaryShort = "";
+      if (convKv) {
+        const summary = await convKv.get(`brain:summary:${chatId}`);
+        if (summary) brainSummaryShort = summary.split(".")[0] + ".";
+      }
+
+      let isPaused = false;
+      try {
+        const pausedRaw = await kv.get(`paused:${chatId}`);
+        if (pausedRaw) {
+          isPaused = Date.now() < new Date(pausedRaw).getTime();
+        }
+      } catch { /* ignore */ }
+
+      return {
+        chatId,
+        contactName: meta.businessConnectionId ? chatId : chatId,
+        relationshipStage: meta.relationshipStage,
+        messageCount: meta.messageCount,
+        lastMessageAt: meta.lastMessageTimestamp ? new Date(meta.lastMessageTimestamp).toISOString() : null,
+        daysSinceLastMessage: meta.lastMessageTimestamp ? Math.floor((Date.now() - meta.lastMessageTimestamp) / 86400000) : null,
+        pendingQuestionsCount: (meta.pendingQuestions || []).length,
+        lastIntent: meta.lastIntent,
+        lastSentiment: meta.lastSentiment,
+        lastUrgency: meta.lastUrgency,
+        isPaused,
+        brainSummaryShort,
+        lowConfCount: meta.lowConfCount || 0,
+      };
+    } catch {
+      return null;
+    }
+  }));
+
+  const filtered = list.filter(Boolean).sort((a, b) => {
+    const at = a!.lastMessageAt ? new Date(a!.lastMessageAt).getTime() : 0;
+    const bt = b!.lastMessageAt ? new Date(b!.lastMessageAt).getTime() : 0;
+    return bt - at;
+  });
+
+  return json(filtered);
+}
+
+// ── New: pending questions ──
+async function getPendingQuestionsList(): Promise<Response> {
+  const kv = getLongTermKv();
+  if (!kv || !kv.list) return json([]);
+
+  const result = await kv.list({prefix: "meta:"});
+  const limit = 50;
+  const slice = result.keys.slice(0, limit);
+
+  const list = await Promise.all(slice.map(async (key) => {
+    const chatId = key.name.replace("meta:", "");
+    try {
+      const raw = await kv.get(key.name);
+      if (!raw) return null;
+      const meta = JSON.parse(raw) as UserMeta;
+      const questions = meta.pendingQuestions || [];
+      if (questions.length === 0) return null;
+
+      return {
+        chatId,
+        contactName: chatId,
+        questions: questions.map((q: string) => ({ question: q, addedAt: null })),
+      };
+    } catch {
+      return null;
+    }
+  }));
+
+  const filtered = list.filter(Boolean).sort((a, b) => b!.questions.length - a!.questions.length);
+  return json(filtered);
+}
+
+// ── New: reply queue ──
+async function getReplyQueue(): Promise<Response> {
+  const kv = getConversationsKv();
+  if (!kv || !kv.list) return json([]);
+
+  const result = await kv.list({prefix: "pending:"});
+  const now = Date.now();
+  const limit = 50;
+  const slice = result.keys.slice(0, limit);
+
+  const list = await Promise.all(slice.map(async (key) => {
+    const chatId = key.name.replace("pending:", "");
+    try {
+      const raw = await kv.get(key.name);
+      if (!raw) return null;
+      const reply = JSON.parse(raw) as { replyAfter: number; isUrgent?: boolean; text?: string; senderName?: string };
+      return {
+        chatId,
+        contactName: reply.senderName || chatId,
+        scheduledAt: new Date(reply.replyAfter).toISOString(),
+        msUntilDue: reply.replyAfter - now,
+        isUrgent: reply.isUrgent || false,
+        messagePreview: (reply.text || "").slice(0, 60),
+      };
+    } catch {
+      return null;
+    }
+  }));
+
+  return json(list.filter(Boolean));
+}
+
+// ── New: health status ──
+async function getHealthStatus(): Promise<Response> {
+  const weekly = await getWeeklyAccumulator();
+  const kvWritesEstimated = weekly.totalMessages * 3 + weekly.brainRunCount * 2;
+  const kvWritePercent = Math.min(Math.round((kvWritesEstimated / 1000) * 100), 100);
+
+  // Read model cooldowns from CONVERSATIONS KV
+  const convKv = getConversationsKv();
+  let modelCooldowns: Array<{ model: string; coolingDown: boolean; expiresAt: string | null }> = [];
+  if (convKv && convKv.list) {
+    try {
+      const cdResult = await convKv.list({prefix: "cooldown:"});
+      const now = Date.now();
+      modelCooldowns = await Promise.all(cdResult.keys.slice(0, 20).map(async (key) => {
+        const model = key.name.replace("cooldown:", "");
+        const raw = await convKv.get(key.name);
+        const until = raw ? Number(raw) || 0 : 0;
+        return {
+          model,
+          coolingDown: until > now,
+          expiresAt: until > now ? new Date(until).toISOString() : null,
+        };
+      }));
+    } catch { /* ignore */ }
+  }
+
+  const modelsInCooldown = modelCooldowns.filter((m) => m.coolingDown).length;
+
+  return json({
+    kvWritesEstimated,
+    kvWriteLimit: 1000,
+    kvWritePercent,
+    modelCooldowns,
+    modelsInCooldown,
+    lastDailyCronAt: weekly.lastDailyCronAt,
+    lastWeeklyCronAt: weekly.lastWeeklyCronAt,
+    brainErrorCount: weekly.brainErrorCount,
+    groqParseFailures: weekly.groqParseFailures,
+    botUptime: "Worker has no persistent uptime — N/A",
+  });
+}
+
+// ── New: conversation action ──
+async function handleConversationAction(chatId: string, body: string): Promise<Response> {
+  try {
+    const {action, pauseMinutes} = JSON.parse(body) as {action?: string; pauseMinutes?: number};
+
+    switch (action) {
+      case "pause": {
+        const minutes = Math.min(Math.max(pauseMinutes || 60, 1), 1440);
+        const until = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+        await setPausedUntil(chatId, until);
+        return json({success: true, message: `Chat paused for ${minutes} minutes`});
+      }
+      case "unpause": {
+        await clearPausedUntil(chatId);
+        return json({success: true, message: "Chat unpaused"});
+      }
+      case "promote": {
+        const stages: UserMeta["relationshipStage"][] = ["stranger", "acquaintance", "warm_lead", "regular"];
+        const meta = await getUserMeta(chatId);
+        const idx = stages.indexOf(meta.relationshipStage);
+        if (idx >= stages.length - 1) {
+          return json({success: false, error: "Already at highest stage"});
+        }
+        const newStage = stages[idx + 1];
+        const {updateUserMeta} = await import("./lib/kv-store.js");
+        await updateUserMeta(chatId, {relationshipStage: newStage});
+        return json({success: true, message: `Promoted to ${newStage}`});
+      }
+      case "force_brain": {
+        runBrainAnalysis(Number(chatId), "Dashboard", true).catch((err) =>
+          console.error(`[Dashboard] Brain analysis error:`, err),
+        );
+        return json({success: true, message: "Brain analysis triggered"});
+      }
+      case "forget_confirm": {
+        await deleteLongTermKey(`meta:${chatId}`);
+        await deleteLongTermKey(`memory:${chatId}`);
+        await deleteConversationsKey(`brain:summary:${chatId}`);
+        await deleteConversationsKey(`persona:${chatId}`);
+        await deleteConversationsKey(`brain:output:${chatId}`);
+        return json({success: true, message: `Chat ${chatId} data wiped`});
+      }
+      default:
+        return json({success: false, error: `Unknown action: ${action}`}, 400);
+    }
+  } catch (e) {
+    return json({success: false, error: String(e)}, 500);
+  }
+}
+
+// ── Extended dashboard data ──
 async function getDashboardData(): Promise<Response> {
   const [usage, geminiModels, groqModels, weekly] = await Promise.all([
     getUsageStats(),
@@ -71,6 +362,17 @@ async function getDashboardData(): Promise<Response> {
     {inputTokens: 0, outputTokens: 0, calls: 0},
   );
 
+  const kvWritesEstimated = weekly.totalMessages * 3 + weekly.brainRunCount * 2;
+  const kvWritePercent = Math.min(Math.round((kvWritesEstimated / 1000) * 100), 100);
+
+  const modelsInCooldown = 0; // will be fetched by health endpoint
+
+  const topIntent = Object.entries(weekly.intentBreakdown).sort(([, a], [, b]) => b - a)[0]?.[0] || "none";
+  const topLang = Object.entries(weekly.languageBreakdown).sort(([, a], [, b]) => b - a)[0]?.[0] || "none";
+  const pos = weekly.sentimentBreakdown.positive;
+  const neg = weekly.sentimentBreakdown.negative;
+  const sentimentLabel = pos > neg ? "mostly positive" : neg > pos ? "mostly negative" : "mixed";
+
   return json({
     usage: {
       month: usage.month,
@@ -87,6 +389,18 @@ async function getDashboardData(): Promise<Response> {
       lowConfTotal: weekly.lowConfTotal,
       unresolvedCount: weekly.unresolvedCount,
       brainRunCount: weekly.brainRunCount,
+      languageBreakdown: weekly.languageBreakdown,
+      sentimentBreakdown: weekly.sentimentBreakdown,
+      intentBreakdown: weekly.intentBreakdown,
+      daily: weekly.daily,
+      topIntent,
+      topLang,
+      sentimentLabel,
+    },
+    health: {
+      kvWritePercent,
+      kvWritesEstimated,
+      modelsInCooldown,
     },
   });
 }
@@ -155,12 +469,13 @@ export function renderDashboardPage(): Response {
 <div id="login-screen" class="login-screen">
   <div class="login-box">
     <h2>Bot Dashboard</h2>
-    <p style="color:#94a3b8;font-size:0.875rem;margin-bottom:16px;">Enter dashboard password</p>
-    <div class="input-group" style="flex-direction:column;">
-      <input type="password" id="password-input" placeholder="Password" onkeydown="if(event.key==='Enter')login()" />
+    <p style="color:#94a3b8;font-size:0.875rem;margin-bottom:16px;">Sign in</p>
+    <div class="input-group" style="flex-direction:column;gap:8px;">
+      <input type="text" id="username-input" placeholder="Username" onkeydown="if(event.key==='Enter')document.getElementById('password-input').focus()" autocomplete="username" />
+      <input type="password" id="password-input" placeholder="Password" onkeydown="if(event.key==='Enter')login()" autocomplete="current-password" />
     </div>
-    <button class="btn primary" onclick="login()" style="width:100%;justify-content:center;">Unlock</button>
-    <div id="login-error" class="error">Wrong password</div>
+    <button class="btn primary" onclick="login()" style="width:100%;justify-content:center;">Sign in</button>
+    <div id="login-error" class="error">Invalid credentials</div>
   </div>
 </div>
 
@@ -177,6 +492,7 @@ export function renderDashboardPage(): Response {
     <button class="tab active" data-tab="overview">Overview</button>
     <button class="tab" data-tab="models">Models</button>
     <button class="tab" data-tab="usage">Usage</button>
+    <button class="tab" data-tab="settings">Settings</button>
   </div>
 
   <div id="tab-overview" class="tab-content active">
@@ -258,6 +574,131 @@ export function renderDashboardPage(): Response {
     </div>
   </div>
 
+  <div id="tab-settings" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <h2>Bot Identity</h2>
+        <button class="btn sm" onclick="resetSettings()">Reset to Defaults</button>
+      </div>
+      <p style="color:#64748b;font-size:0.8rem;margin-bottom:12px;">Changes take effect within ~30 seconds (settings cache TTL).</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Bot Name</label>
+          <input type="text" id="set-name" />
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Owner Name</label>
+          <input type="text" id="set-owner" />
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Location</label>
+        <input type="text" id="set-from" />
+      </div>
+      <div style="margin-top:12px;">
+        <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Work</label>
+        <input type="text" id="set-work" />
+      </div>
+      <div style="margin-top:12px;">
+        <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Style</label>
+        <input type="text" id="set-style" />
+      </div>
+      <div style="margin-top:12px;">
+        <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Languages (comma separated)</label>
+        <input type="text" id="set-languages" />
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Bot Commands</h2>
+      </div>
+      <p style="color:#64748b;font-size:0.8rem;margin-bottom:12px;">These commands are registered with Telegram. Changes visible after next command registration.</p>
+      <div id="commands-list"></div>
+      <div class="input-group" style="margin-top:8px;">
+        <input type="text" id="cmd-command" placeholder="command_name (no slash)" style="flex:1;" />
+        <input type="text" id="cmd-desc" placeholder="Description" style="flex:2;" />
+        <button class="btn primary sm" onclick="addCommand()">+ Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Voice & Personality</h2>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Tone</label>
+        <input type="text" id="set-voice-tone" />
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Humor</label>
+        <input type="text" id="set-voice-humor" />
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Style</label>
+        <input type="text" id="set-voice-style" />
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Language</label>
+        <input type="text" id="set-voice-language" />
+      </div>
+      <div>
+        <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Features (one per line)</label>
+        <textarea id="set-voice-features" rows="4" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:0.875rem;font-family:monospace;resize:vertical;"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Absolute Rules</h2>
+      </div>
+      <p style="color:#64748b;font-size:0.8rem;margin-bottom:8px;">One rule per line. These shape the AI's behavior.</p>
+      <textarea id="set-absolute-rules" rows="8" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:0.875rem;font-family:monospace;resize:vertical;"></textarea>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Never Say (banned phrases)</h2>
+      </div>
+      <p style="color:#64748b;font-size:0.8rem;margin-bottom:8px;">One phrase per line. The AI will avoid these entirely.</p>
+      <textarea id="set-never-say" rows="4" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:0.875rem;font-family:monospace;resize:vertical;"></textarea>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Behavior Rules</h2>
+      </div>
+      <textarea id="set-behavior-rules" rows="4" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:0.875rem;font-family:monospace;resize:vertical;"></textarea>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Fallback Rules</h2>
+      </div>
+      <textarea id="set-fallback-rules" rows="4" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:0.875rem;font-family:monospace;resize:vertical;"></textarea>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Contact Info (Business Mode)</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Contact (one per line)</label>
+          <textarea id="set-contact" rows="3" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:0.875rem;font-family:monospace;resize:vertical;"></textarea>
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Business Tone</label>
+          <input type="text" id="set-business-tone" />
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:20px;">
+      <button class="btn primary" onclick="saveSettings()">Save All Settings</button>
+    </div>
+  </div>
+
   <div id="toast" class="toast"></div>
 </div>
 
@@ -270,8 +711,9 @@ function getHeaders() {
 }
 
 function login() {
+  const user = document.getElementById("username-input").value;
   const pw = document.getElementById("password-input").value;
-  token = pw;
+  token = user + ":" + pw;
   sessionStorage.setItem("dash_token", token);
   fetchData().then(ok => {
     if (!ok) {
@@ -298,9 +740,15 @@ async function authFetch(url, opts = {}) {
 
 async function fetchData() {
   try {
-    const res = await authFetch("/api/dashboard/data");
-    if (!res.ok) return false;
-    state = await res.json();
+    const [dataRes, settingsRes] = await Promise.all([
+      authFetch("/api/dashboard/data"),
+      authFetch("/api/dashboard/settings"),
+    ]);
+    if (!dataRes.ok) return false;
+    state = await dataRes.json();
+    if (settingsRes.ok) {
+      state.settings = await settingsRes.json();
+    }
     document.getElementById("login-screen").style.display = "none";
     document.getElementById("dashboard").style.display = "block";
     document.getElementById("login-error").style.display = "none";
@@ -322,6 +770,7 @@ function render() {
   renderGroqUsage();
   renderGeminiModels();
   renderGroqModels();
+  if (state.settings) renderSettings(state.settings);
   document.getElementById("month-display").textContent = "Month: " + (state.usage?.month || "—");
 }
 
@@ -477,6 +926,122 @@ async function resetUsage() {
   if (res.ok) { toast("Usage reset"); fetchData(); }
 }
 
+// ── Settings tab ──
+async function loadSettings() {
+  const res = await authFetch("/api/dashboard/settings");
+  if (!res.ok) return;
+  const s = await res.json();
+  state.settings = s;
+  renderSettings(s);
+}
+
+function renderSettings(s) {
+  document.getElementById("set-name").value = s.name || "";
+  document.getElementById("set-owner").value = s.ownerName || "";
+  document.getElementById("set-from").value = s.background?.from || "";
+  document.getElementById("set-work").value = s.background?.work || "";
+  document.getElementById("set-style").value = s.background?.style || "";
+  document.getElementById("set-languages").value = (s.background?.languages || []).join(", ");
+
+  document.getElementById("set-voice-tone").value = s.voice?.tone || "";
+  document.getElementById("set-voice-humor").value = s.voice?.humor || "";
+  document.getElementById("set-voice-style").value = s.voice?.style || "";
+  document.getElementById("set-voice-language").value = s.voice?.language || "";
+  document.getElementById("set-voice-features").value = (s.voice?.features || []).join("\n");
+
+  document.getElementById("set-absolute-rules").value = (s.absoluteRules || []).join("\n");
+  document.getElementById("set-never-say").value = (s.neverSay || []).join("\n");
+  document.getElementById("set-behavior-rules").value = (s.behaviorRules || []).join("\n");
+  document.getElementById("set-fallback-rules").value = (s.fallbackRules || []).join("\n");
+
+  document.getElementById("set-contact").value = (s.businessMode?.contact || []).join("\n");
+  document.getElementById("set-business-tone").value = s.businessMode?.tone || "";
+
+  renderCommands(s.commands || []);
+}
+
+let settingsCommands = [];
+
+function renderCommands(cmds) {
+  settingsCommands = cmds.slice();
+  const el = document.getElementById("commands-list");
+  if (cmds.length === 0) {
+    el.innerHTML = '<span style="color:#64748b;">No custom commands configured</span>';
+    return;
+  }
+  el.innerHTML = cmds.map((c, i) =>
+    '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #1e293b;">' +
+    '<code style="background:#0f172a;padding:2px 8px;border-radius:4px;color:#93c5fd;">/' + esc(c.command) + '</code>' +
+    '<span style="flex:1;color:#94a3b8;">' + esc(c.description) + '</span>' +
+    '<span style="cursor:pointer;color:#ef4444;font-size:0.8rem;" onclick="removeCommand(' + i + ')">✕</span>' +
+    '</div>'
+  ).join("");
+}
+
+function addCommand() {
+  const cmd = document.getElementById("cmd-command").value.trim();
+  const desc = document.getElementById("cmd-desc").value.trim();
+  if (!cmd || !desc) return toast("Both command and description required", true);
+  if (settingsCommands.find((c) => c.command === cmd)) return toast("Command already exists", true);
+  settingsCommands.push({command: cmd, description: desc});
+  document.getElementById("cmd-command").value = "";
+  document.getElementById("cmd-desc").value = "";
+  renderCommands(settingsCommands);
+  toast("Command added — save to persist");
+}
+
+function removeCommand(i) {
+  settingsCommands.splice(i, 1);
+  renderCommands(settingsCommands);
+}
+
+function collectSettings() {
+  return {
+    name: document.getElementById("set-name").value.trim(),
+    ownerName: document.getElementById("set-owner").value.trim(),
+    background: {
+      from: document.getElementById("set-from").value.trim(),
+      timezone: "Asia/Tashkent (UTC+5)",
+      work: document.getElementById("set-work").value.trim(),
+      style: document.getElementById("set-style").value.trim(),
+      languages: document.getElementById("set-languages").value.split(",").map((s) => s.trim()).filter(Boolean),
+    },
+    voice: {
+      tone: document.getElementById("set-voice-tone").value.trim(),
+      humor: document.getElementById("set-voice-humor").value.trim(),
+      style: document.getElementById("set-voice-style").value.trim(),
+      language: document.getElementById("set-voice-language").value.trim(),
+      features: document.getElementById("set-voice-features").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    },
+    absoluteRules: document.getElementById("set-absolute-rules").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    neverSay: document.getElementById("set-never-say").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    behaviorRules: document.getElementById("set-behavior-rules").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    fallbackRules: document.getElementById("set-fallback-rules").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    businessMode: {
+      contact: document.getElementById("set-contact").value.split("\n").map((s) => s.trim()).filter(Boolean),
+      tone: document.getElementById("set-business-tone").value.trim(),
+    },
+    commands: settingsCommands,
+  };
+}
+
+async function saveSettings() {
+  const settings = collectSettings();
+  const res = await authFetch("/api/dashboard/settings", {
+    method: "PUT",
+    headers: {"content-type": "application/json"},
+    body: JSON.stringify(settings),
+  });
+  if (res.ok) { toast("Settings saved. Cache refreshes in ~30s."); fetchData(); }
+  else toast("Failed to save", true);
+}
+
+async function resetSettings() {
+  if (!confirm("Reset all bot settings to defaults?")) return;
+  const res = await authFetch("/api/dashboard/settings/reset", {method: "POST"});
+  if (res.ok) { toast("Settings reset to defaults"); fetchData(); }
+}
+
 function statCard(label, value, color) {
   return '<div class="stat"><div class="stat-label">' + esc(label) + '</div><div class="stat-value ' + color + '">' + value + '</div></div>';
 }
@@ -499,6 +1064,9 @@ document.querySelectorAll(".tab").forEach(btn => {
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    if (btn.dataset.tab === "settings" && !state.settings) {
+      loadSettings();
+    }
   });
 });
 

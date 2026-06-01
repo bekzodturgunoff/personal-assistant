@@ -6,6 +6,7 @@
 import type {BrainProvider, BrainAnalysis, ConversationEntry} from "../types.js";
 import {BRAIN_OUTPUT_DEFAULTS} from "../types.js";
 import {callGroqWithFallback} from "../../lib/groq.js";
+import {getWeeklyAccumulator, saveWeeklyAccumulator} from "../../lib/kv-store.js";
 
 const BRAIN_PROMPT = `You are a silent background analyst. You never talk to users. Your only job is to analyze a Telegram business conversation and return a JSON object.
 
@@ -100,6 +101,10 @@ export function createGroqBrainProvider(): BrainProvider {
         return merged;
       } catch (err) {
         console.error("[Brain/Groq] Analysis failed:", err);
+        getWeeklyAccumulator().then((acc) => {
+          acc.groqParseFailures++;
+          saveWeeklyAccumulator(acc);
+        }).catch(() => {});
         return {...BRAIN_OUTPUT_DEFAULTS, summary: currentSummary};
       }
     },

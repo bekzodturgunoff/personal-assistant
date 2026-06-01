@@ -12,6 +12,7 @@ compatibility_date = "2026-05-23"
 # SEARCH_API_KEY       — Web search API key
 # PORT                 — Local dev server port (default: 3000)
 # AI_MODEL / AI_FALLBACK_MODEL* — Gemini model overrides
+# DASHBOARD_USERNAME   — Username for the web dashboard at /api/dashboard
 # DASHBOARD_PASSWORD   — Password for the web dashboard at /api/dashboard
 #
 # ── KV namespace usage ──

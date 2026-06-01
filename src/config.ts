@@ -49,6 +49,9 @@ export const config = {
     }
     return n;
   },
+  get dashboardUsername(): string {
+    return getEnv("DASHBOARD_USERNAME") || "";
+  },
   get dashboardPassword(): string {
     return getEnv("DASHBOARD_PASSWORD") || "";
   },

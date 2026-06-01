@@ -2,7 +2,7 @@ import type {BrainAnalysis, BrainProvider, BrainOutput} from "./types.js";
 import {BRAIN_OUTPUT_DEFAULTS} from "./types.js";
 import {createGroqBrainProvider} from "./providers/groq-brain.js";
 import {getFullHistory} from "../conversation-memory.js";
-import {getConversationsKv, updateUserMeta, getWeeklyAccumulator, saveWeeklyAccumulator} from "../lib/kv-store.js";
+import {getConversationsKv, updateUserMeta, getWeeklyAccumulator, saveWeeklyAccumulator, touchDailyEntry} from "../lib/kv-store.js";
 
 let provider: BrainProvider | null = null;
 const brainAnalysisInProgress = new Set<number>();
@@ -97,6 +97,9 @@ export async function runBrainAnalysis(
       analysis = await bp.analyze(history, currentSummary, existingFacts, senderName);
     } catch (err) {
       console.error(`[Brain] Analysis failed for chat ${chatId}:`, err);
+      const failAcc = await getWeeklyAccumulator();
+      failAcc.brainErrorCount++;
+      await saveWeeklyAccumulator(failAcc);
       return;
     }
 
@@ -142,6 +145,12 @@ export async function runBrainAnalysis(
     if (analysis.pending_questions.length > 0) {
       acc.unresolvedCount++;
     }
+    if (analysis.sentiment === "positive") acc.sentimentBreakdown.positive++;
+    else if (analysis.sentiment === "negative") acc.sentimentBreakdown.negative++;
+    else acc.sentimentBreakdown.neutral++;
+    const intentKey = analysis.intent as keyof typeof acc.intentBreakdown;
+    if (intentKey in acc.intentBreakdown) acc.intentBreakdown[intentKey]++;
+    touchDailyEntry(acc, 0, 1);
     await saveWeeklyAccumulator(acc);
 
     console.log(`[Brain] Analysis complete for chat ${chatId}`);

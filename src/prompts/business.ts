@@ -8,65 +8,30 @@
 import {callGeminiStructured, limitResponse} from "../lib/gemini.js";
 import type {GeminiResponse} from "../lib/gemini.js";
 import {formatTashkentTime} from "../lib/reply-timing.js";
-import persona from "../persona.json" with {type: "json"};
+import {getBotSettings, buildIdentityPrompt} from "../lib/bot-settings.js";
+import type {BotSettings} from "../lib/bot-settings.js";
 
-const NEVER_SAY_BLOCK = persona.speech_patterns?.never_say
-  ? persona.speech_patterns.never_say.map((s: string) => `- Never say: "${s}"`).join("\n")
-  : "";
+let cachedSettings: BotSettings | null = null;
+let cachedIdentityPrompt: string | null = null;
+let settingsCacheTime = 0;
+const SETTINGS_TTL = 30_000;
 
-const TIME_PERSONALITY_BLOCK = persona.time_personality
-  ? Object.entries(persona.time_personality)
-      .map(([slot, desc]) => `    ${slot} → "${desc}"`)
-      .join("\n")
-  : "";
-
-const IDENTITY_PROMPT = `
-You are Bekzod. You reply as yourself — a real person, not an AI.
-
-BACKGROUND:
-- Name: Bekzod
-- From: Namangan, Uzbekistan
-- Timezone: Tashkent (UTC+5)
-- Work: Founder / builder running multiple projects
-- Style: Samimiy, takalluf bilan. Namangancha — yumshoq, muloyim.
-- Languages: Uzbek (Namangan dialect), Russian, English
-
-VOICE:
-${JSON.stringify(persona.voice, null, 2)}
-
-TIME PERSONALITY (adjust tone based on time of day):
-${TIME_PERSONALITY_BLOCK}
-
-ABSOLUTE RULES:
-- Never say you are an AI or a bot under any circumstances
-- Never apologize excessively — one brief acknowledgment is enough
-- Never use formal closings like "Hurmat bilan" unless the other person used them first
-- Never make up prices, deadlines, or commitments you are not sure about
-- If unsure about a fact, use one of: "men tekshirib beraman" / "aniqlab beraman" / "hozir bilib olaman"
-- Max 2-3 sentences per reply unless they asked a complex question
-- Match their exact language (Uzbek / Russian / English / mixed)
-- Never end a sentence with a period/dot — write like a real person texting
-- Don't acknowledge time gaps or reply timing — just reply naturally as if no time passed
-- Never use filler phrases like "Great question!" or "Certainly!"
-- If someone asks for your contact or how to reach you, share: https://itsbek.me/ or your phone number +998501886669
-- Always follow the REPLY_LENGTH instruction above. Never write more than instructed unless the client explicitly asked a multi-part question.
-${NEVER_SAY_BLOCK}
-
-RESPONSE FORMAT (always return valid JSON):
-{
-  "text": "your reply here",
-  "confidence": 0.0-1.0,
-  "is_factual_claim": true/false
+async function getSettings(): Promise<BotSettings> {
+  const now = Date.now();
+  if (cachedSettings && cachedIdentityPrompt && now - settingsCacheTime < SETTINGS_TTL) {
+    return cachedSettings;
+  }
+  const settings = await getBotSettings();
+  cachedSettings = settings;
+  cachedIdentityPrompt = await buildIdentityPrompt(settings);
+  settingsCacheTime = now;
+  return settings;
 }
 
-confidence guide:
-  1.0 = greeting, casual reply, no facts involved
-  0.8 = general knowledge you are sure about
-  0.6 = something you half-remember or are inferring
-  0.4 = specific price, date, or commitment you are guessing
-Set is_factual_claim: true whenever text contains a price, date, 
-delivery time, product spec, or any hard commitment.
-`.trim();
+export async function getIdentityPrompt(): Promise<string> {
+  await getSettings();
+  return cachedIdentityPrompt || "";
+}
 
 export interface ReplyContext {
   contactName: string;
@@ -237,8 +202,10 @@ export async function businessAssistantReply(
 
   const isObjection = context.intent === "complaint" && context.sentiment === "negative";
 
+  const identityPrompt = await getIdentityPrompt();
+
   const parts: string[] = [
-    IDENTITY_PROMPT,
+    identityPrompt,
     "",
     dynamicBlock,
     "",

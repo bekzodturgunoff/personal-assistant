@@ -1,12 +1,7 @@
 import {Bot} from "grammy/web";
 import {config} from "./config.js";
 import {setupTelegramHandlers} from "./handlers/telegram.js";
-
-const PUBLIC_COMMANDS = [
-  {command: "mute", description: "Stop the bot"},
-  {command: "unmute", description: "Resume the bot"},
-  {command: "remind", description: "Set a reminder"},
-] as const;
+import {getBotSettings} from "./lib/bot-settings.js";
 
 let commandsRegistered = false;
 
@@ -25,10 +20,14 @@ export function createBot() {
 export async function registerPublicCommands(bot: Bot): Promise<void> {
   if (commandsRegistered) return;
   try {
+    const settings = await getBotSettings();
+    const cmds = settings.commands.length > 0
+      ? settings.commands.map((c) => ({command: c.command, description: c.description}))
+      : [{command: "mute" as const, description: "Stop the bot"}, {command: "unmute" as const, description: "Resume the bot"}, {command: "remind" as const, description: "Set a reminder"}];
     await Promise.all([
-      bot.api.setMyCommands(PUBLIC_COMMANDS),
-      bot.api.setMyCommands(PUBLIC_COMMANDS, {scope: {type: "all_private_chats"}}),
-      bot.api.setMyCommands(PUBLIC_COMMANDS, {scope: {type: "all_group_chats"}}),
+      bot.api.setMyCommands(cmds),
+      bot.api.setMyCommands(cmds, {scope: {type: "all_private_chats"}}),
+      bot.api.setMyCommands(cmds, {scope: {type: "all_group_chats"}}),
     ]);
     commandsRegistered = true;
   } catch (err) {

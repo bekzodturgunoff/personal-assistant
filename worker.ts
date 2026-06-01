@@ -144,7 +144,7 @@ export default {
 
       if (url.pathname === '/' || url.pathname === '') {
         await ensureTelegramWebhook(bot, url.origin);
-        if (config.dashboardPassword) {
+        if (config.dashboardUsername && config.dashboardPassword) {
           return Response.redirect(`${url.origin}/api/dashboard`, 302);
         }
         return renderHomePage();
@@ -175,9 +175,10 @@ export default {
 
       // ── Dashboard ──
       if (url.pathname.startsWith("/api/dashboard")) {
+        const user = config.dashboardUsername;
         const pw = config.dashboardPassword;
-        if (!pw) {
-          return new Response('Dashboard disabled. Set DASHBOARD_PASSWORD in environment variables.', {
+        if (!user || !pw) {
+          return new Response('Dashboard disabled. Set DASHBOARD_USERNAME and DASHBOARD_PASSWORD.', {
             status: 404,
             headers: {"content-type": "text/plain; charset=utf-8"},
           });
@@ -187,7 +188,7 @@ export default {
         }
         const auth = request.headers.get("Authorization") || "";
         const token = auth.replace(/^Bearer\s+/i, "");
-        if (token !== pw) {
+        if (token !== `${user}:${pw}`) {
           return new Response("Unauthorized", { status: 401 });
         }
         const body = request.method === "PUT" || request.method === "POST" ? await request.text() : null;
