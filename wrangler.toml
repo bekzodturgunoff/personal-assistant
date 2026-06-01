@@ -2,8 +2,41 @@ name = "personal-assistan-bot"
 main = "worker.ts"
 compatibility_date = "2026-05-23"
 
+# ── Required environment variables ──
+# TELEGRAM_BOT_TOKEN   — Telegram bot token from @BotFather
+# AI_API_KEY           — Google Gemini API key
+# GROQ_API_KEY         — Groq API key (for brain analysis)
+# OWNER_USER_ID        — Your Telegram user ID (numeric), for handoff alerts & briefings
+#
+# ── Optional environment variables ──
+# SEARCH_API_KEY       — Web search API key
+# PORT                 — Local dev server port (default: 3000)
+# AI_MODEL / AI_FALLBACK_MODEL* — Gemini model overrides
+#
+# ── KV namespace usage ──
+# CONVERSATIONS namespace:
+#   chat:{id}          → JSON array of conversation entries
+#   persona:{id}       → JSON UserPersona
+#   timing:{id}        → JSON ChatTimingState
+#   muted:{id}         → "true" / "false"
+#   cooldown:{model}   → timestamp number (Gemini model cooldown)
+#   brain:summary:{id} → conversation summary string
+#   brain:output:{id}  → JSON BrainOutput
+#   _pending_replies   → JSON array of PendingReply (global list)
+#
+# TASKS namespace:
+#   tasks:{user_id}    → JSON array of Task
+#
+# LONG_TERM_MEMORY namespace:
+#   memory:{id}         → JSON UserMemory (long-term facts)
+#   owner_profile       → JSON UserMemory (owner facts)
+#   meta:{id}           → JSON UserMeta (unified: pendingQuestions, lowConfCount,
+#                           relationshipStage, firstContactDate, lastIntent,
+#                           lastSentiment, lastUrgency, messageCount)
+#   analytics:current   → JSON WeeklyAccumulator (weekly analytics accumulator)
+
 [triggers]
-crons = ["0 3 * * *"]
+crons = ["0 3 * * *", "0 3 * * 1"]
 
 [[kv_namespaces]]
 binding = "CONVERSATIONS"

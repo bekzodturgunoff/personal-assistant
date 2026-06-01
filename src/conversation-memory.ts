@@ -1,9 +1,10 @@
-const MAX_HISTORY = 40;
-const MAX_CONTEXT = 15;
+const MAX_HISTORY = 100;
+const MAX_CONTEXT = 50;
 
-interface Entry {
+export interface Entry {
   role: "user" | "assistant";
   text: string;
+  timestamp: number;
 }
 
 interface KvStore {
@@ -23,11 +24,13 @@ export async function addMessage(
   role: Entry["role"],
   text: string,
 ): Promise<void> {
+  const entry: Entry = {role, text, timestamp: Date.now()};
+
   if (kvBinding) {
     const key = `chat:${chatId}`;
     const raw = await kvBinding.get(key);
     const history: Entry[] = raw ? JSON.parse(raw) : [];
-    history.push({role, text});
+    history.push(entry);
     if (history.length > MAX_HISTORY) {
       history.splice(0, history.length - MAX_HISTORY);
     }
@@ -38,7 +41,7 @@ export async function addMessage(
       history = [];
       store.set(chatId, history);
     }
-    history.push({role, text});
+    history.push(entry);
     if (history.length > MAX_HISTORY) {
       history.splice(0, history.length - MAX_HISTORY);
     }
@@ -56,5 +59,15 @@ export async function getRecentHistory(chatId: number): Promise<Entry[]> {
     const history = store.get(chatId);
     if (!history) return [];
     return history.slice(-MAX_CONTEXT);
+  }
+}
+
+export async function getFullHistory(chatId: number): Promise<Entry[]> {
+  if (kvBinding) {
+    const key = `chat:${chatId}`;
+    const raw = await kvBinding.get(key);
+    return raw ? JSON.parse(raw) : [];
+  } else {
+    return store.get(chatId) ?? [];
   }
 }

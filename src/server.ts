@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import express from "express";
 import {webhookCallback} from "grammy/web";
-import {createBot} from "./bot.js";
+import {createBot, registerPublicCommands} from "./bot.js";
 import {config} from "./config.js";
 import {getEnv} from "./runtime-env.js";
 
@@ -24,24 +24,8 @@ async function main() {
   }
 
   const bot = createBot();
+  await registerPublicCommands(bot);
   const webhookUrl = getEnv("WEBHOOK_URL");
-  const commands = [
-    {command: "start", description: "Start the bot"},
-    {command: "help", description: "Show help"},
-    {command: "tasks", description: "Show your tasks"},
-    {command: "remind", description: "Set a reminder"},
-    {command: "done", description: "Mark a task as done"},
-  ] as const;
-
-  try {
-    await Promise.all([
-      bot.api.setMyCommands(commands),
-      bot.api.setMyCommands(commands, {scope: {type: "all_private_chats"}}),
-      bot.api.setMyCommands(commands, {scope: {type: "all_group_chats"}}),
-    ]);
-  } catch (err) {
-    console.warn("Failed to set bot commands (non-fatal):", err);
-  }
 
   if (webhookUrl) {
     try {

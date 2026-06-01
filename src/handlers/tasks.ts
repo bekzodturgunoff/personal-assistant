@@ -1,8 +1,7 @@
 import type {Bot, Context} from "grammy/web";
-import {getTasksKv} from "../lib/kv-store.js";
+import {getTasksKv, getConversationsKv, getWeeklyAccumulator, resetWeeklyAccumulator} from "../lib/kv-store.js";
 import {generateWithFallback} from "../lib/gemini.js";
 import {config} from "../config.js";
-import {getEnv} from "../runtime-env.js";
 
 interface Task {
   id: string;
@@ -148,7 +147,7 @@ export async function checkDueTasks(): Promise<void> {
   const kv = getTasksKv();
   if (!kv) return;
 
-  const ownerId = getEnv("OWNER_CHAT_ID");
+  const ownerId = config.ownerUserId;
   if (!ownerId) return;
 
   const list = await kv.get("tasks:" + ownerId);
@@ -181,29 +180,78 @@ export async function handleNaturalLanguageTask(ctx: Context, text: string): Pro
   return await createTaskFromText(ctx, ctx.from.id, text);
 }
 
+async function getPendingQuestionsBlock(): Promise<string> {
+  const convKv = getConversationsKv();
+  if (!convKv || !convKv.list) return "";
+  try {
+    const prefix = "brain:output:";
+    const listResult = await convKv.list({prefix});
+    if (!listResult.keys.length) return "";
+
+    const questions: string[] = [];
+    for (const key of listResult.keys) {
+      const raw = await convKv.get(key.name);
+      if (!raw) continue;
+      const output = JSON.parse(raw);
+      const pqs = output.pending_questions || output.pendingQuestions || [];
+      if (pqs.length > 0) {
+        const chatId = key.name.replace(prefix, "");
+        for (const q of pqs) {
+          questions.push(`- From ${chatId}: ${q}`);
+        }
+      }
+    }
+
+    if (questions.length === 0) return "";
+    return "\n\nPending questions from conversations:\n" + questions.join("\n");
+  } catch {
+    return "";
+  }
+}
+
+async function computeWeeklyStats(): Promise<string> {
+  try {
+    const acc = await getWeeklyAccumulator();
+    if (acc.totalMessages === 0) return "No conversations yet.";
+    return `📊 Weekly Analytics:\n- Active conversations: ${acc.conversationsSeen.length}\n- Total messages: ${acc.totalMessages}\n- Low confidence events: ${acc.lowConfTotal}\n- Unresolved items: ${acc.unresolvedCount}`;
+  } catch (e) {
+    console.error("[WeeklyStats] Error:", e);
+    return "Stats unavailable.";
+  }
+}
+
 export async function handleMorningBriefing(): Promise<void> {
   const kv = getTasksKv();
-  const ownerId = getEnv("OWNER_CHAT_ID");
+  const ownerId = config.ownerUserId;
   if (!ownerId || !kv) return;
 
   const list = await kv.get("tasks:" + ownerId);
-  if (!list) return;
-  const tasks: Task[] = JSON.parse(list);
+  if (!list && !await getConversationsKv()) return;
+
   const now = Date.now();
-  const dayStart = now - (now % 86400000) + 3 * 3600000;
-  const dayEnd = dayStart + 86400000;
-  const today = tasks.filter((t) => !t.done && t.dueAt && t.dueAt >= dayStart && t.dueAt <= dayEnd);
-  const overdue = tasks.filter((t) => !t.done && t.dueAt && t.dueAt < now);
 
-  if (today.length === 0 && overdue.length === 0) return;
+  let msg = "🌅 Morning briefing";
 
-  let msg = "🌅 Morning briefing\n";
-  if (today.length > 0) {
-    msg += "\n📋 Due today:\n" + today.map((t) => `- ${t.text}`).join("\n");
+  if (list) {
+    const tasks: Task[] = JSON.parse(list);
+    const dayStart = now - (now % 86400000) + 3 * 3600000;
+    const dayEnd = dayStart + 86400000;
+    const today = tasks.filter((t) => !t.done && t.dueAt && t.dueAt >= dayStart && t.dueAt <= dayEnd);
+    const overdue = tasks.filter((t) => !t.done && t.dueAt && t.dueAt < now);
+
+    if (today.length > 0) {
+      msg += "\n\n📋 Due today:\n" + today.map((t) => `- ${t.text}`).join("\n");
+    }
+    if (overdue.length > 0) {
+      msg += "\n\n⏰ Overdue:\n" + overdue.map((t) => `- ${t.text}`).join("\n");
+    }
   }
-  if (overdue.length > 0) {
-    msg += "\n\n⏰ Overdue:\n" + overdue.map((t) => `- ${t.text}`).join("\n");
+
+  const pendingBlock = await getPendingQuestionsBlock();
+  if (pendingBlock) {
+    msg += pendingBlock;
   }
+
   msg += "\n\nLet's get it done. 🚀";
 
   try {
@@ -215,6 +263,26 @@ export async function handleMorningBriefing(): Promise<void> {
   } catch (e) {
     console.error("Morning briefing error:", e);
   }
+}
+
+export async function handleWeeklyAnalytics(): Promise<void> {
+  const ownerId = config.ownerUserId;
+  if (!ownerId) return;
+
+  const stats = await computeWeeklyStats();
+  const msg = `${stats}\n\nHave a great week! 🚀`;
+
+  try {
+    await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({chat_id: Number(ownerId), text: msg}),
+    });
+  } catch (e) {
+    console.error("Weekly analytics error:", e);
+  }
+
+  await resetWeeklyAccumulator();
 }
 
 export function registerTaskHandlers(bot: Bot): void {

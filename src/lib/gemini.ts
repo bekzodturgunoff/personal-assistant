@@ -130,6 +130,12 @@ async function callGemini(
   return null;
 }
 
+export interface GeminiResponse {
+  text: string;
+  confidence: number;
+  isFactualClaim: boolean;
+}
+
 export async function callGeminiWithFallback(prompt: string): Promise<string> {
   const reqId = ++requestCounter;
   const now = Date.now();
@@ -181,4 +187,24 @@ export async function generateWithFallback(
   prompt: string,
 ) {
   return callGeminiWithFallback(prompt);
+}
+
+export async function callGeminiStructured(
+  prompt: string,
+): Promise<GeminiResponse> {
+  const jsonPrompt = `${prompt}\n\nRespond with a JSON object containing exactly these fields:\n- "text": your main reply text\n- "confidence": a number 0.0 to 1.0 indicating how confident you are in this reply\n- "is_factual_claim": boolean — true if this reply makes a factual claim about the person or world, false if it's just conversation\n\nOnly output valid JSON with no extra text.`;
+  try {
+    const raw = await callGeminiWithFallback(jsonPrompt);
+    const cleaned = raw.replace(/```(json)?/g, "").trim();
+    const parsed = JSON.parse(cleaned) as { text?: string; confidence?: number; is_factual_claim?: boolean };
+    return {
+      text: typeof parsed.text === "string" ? parsed.text : raw,
+      confidence: typeof parsed.confidence === "number" ? parsed.confidence : 1.0,
+      isFactualClaim: parsed.is_factual_claim === true,
+    };
+  } catch (e) {
+    console.error("[GeminiStructured] Parse failed, falling back to raw:", e);
+    const text = await callGeminiWithFallback(prompt);
+    return {text, confidence: 1.0, isFactualClaim: false};
+  }
 }

@@ -16,6 +16,8 @@ interface UserPersona {
   tone: string;
   messageCount: number;
   lastUpdated: number;
+  firstContactDate: number;
+  relationshipStage: "new" | "familiar" | "regular" | "close";
 }
 
 let kvBinding: KvStore | null = null;
@@ -30,6 +32,8 @@ const defaultPersona = (): UserPersona => ({
   tone: "neutral",
   messageCount: 0,
   lastUpdated: 0,
+  firstContactDate: 0,
+  relationshipStage: "new",
 });
 
 function detectTopics(text: string): string[] {
@@ -55,6 +59,13 @@ function detectTone(text: string): string {
   return "neutral";
 }
 
+function inferRelationshipStage(count: number): UserPersona["relationshipStage"] {
+  if (count >= 30) return "close";
+  if (count >= 12) return "regular";
+  if (count >= 4) return "familiar";
+  return "new";
+}
+
 export async function recordMessage(
   chatId: number,
   role: Entry["role"],
@@ -68,7 +79,13 @@ export async function recordMessage(
     if (raw) persona = JSON.parse(raw);
   }
 
+  if (persona.firstContactDate === 0) {
+    persona.firstContactDate = Date.now();
+  }
+
   persona.messageCount++;
+  persona.relationshipStage = inferRelationshipStage(persona.messageCount);
+
   const newTopics = detectTopics(text);
   for (const t of newTopics) {
     if (!persona.topics.includes(t)) persona.topics.push(t);
@@ -96,6 +113,11 @@ export async function getPersona(chatId: number): Promise<UserPersona> {
 export async function buildPersonaBlock(chatId: number): Promise<string> {
   const p = await getPersona(chatId);
   const parts: string[] = [];
+
+  if (p.relationshipStage !== "new") {
+    parts.push(`Relationship: ${p.relationshipStage} (${p.messageCount} messages so far).`);
+  }
+
   if (p.topics.length > 0) {
     parts.push(`Topics they discuss: ${p.topics.join(", ")}.`);
   }
@@ -106,4 +128,9 @@ export async function buildPersonaBlock(chatId: number): Promise<string> {
     parts.push(`Summary of past chats: ${p.summary}`);
   }
   return parts.length > 0 ? `\nAbout this person:\n${parts.join("\n")}\n` : "";
+}
+
+export async function getRelationshipStage(chatId: number): Promise<UserPersona["relationshipStage"]> {
+  const p = await getPersona(chatId);
+  return p.relationshipStage;
 }

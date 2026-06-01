@@ -1,50 +1,23 @@
 import {webhookCallback} from "grammy/web";
-import {createBot} from "./src/bot.js";
+import {createBot, registerPublicCommands} from "./src/bot.js";
 import {config} from "./src/config.js";
 import {setRuntimeEnv} from "./src/runtime-env.js";
 import {setKvBinding} from "./src/conversation-memory.js";
 import {setKvBinding as setPersonaKv} from "./src/persona-memory.js";
 import {setConversationsKv, setTasksKv, setLongTermKv, setModelCooldownKv} from "./src/lib/kv-store.js";
-import {handleMorningBriefing, checkDueTasks} from "./src/handlers/tasks.js";
+import {setChatStateKv} from "./src/lib/chat-state.js";
+import {handleMorningBriefing, handleWeeklyAnalytics, checkDueTasks} from "./src/handlers/tasks.js";
+import {processDuePendingReplies} from "./src/handlers/business.js";
 
 type RuntimeBindings = Record<string, unknown>;
 
 let botInstance: ReturnType<typeof createBot> | undefined;
-let commandsInitialized = false;
 
 function getBot(): ReturnType<typeof createBot> {
   if (!botInstance) {
     botInstance = createBot();
   }
   return botInstance;
-}
-
-async function ensureCommands(
-  bot: ReturnType<typeof createBot>,
-): Promise<void> {
-  if (commandsInitialized) return;
-
-  const commands = [
-    {command: "start", description: "Start the bot"},
-    {command: "help", description: "Show help"},
-    {command: "tasks", description: "Show your tasks"},
-    {command: "remind", description: "Set a reminder"},
-    {command: "done", description: "Mark a task as done"},
-  ] as const;
-
-  try {
-    await Promise.all([
-      bot.api.setMyCommands(commands),
-      bot.api.setMyCommands(commands, {scope: {type: "all_private_chats"}}),
-      bot.api.setMyCommands(commands, {scope: {type: "all_group_chats"}}),
-    ]);
-    commandsInitialized = true;
-  } catch (error) {
-    console.warn(
-      "Failed to set bot commands in Cloudflare Worker (non-fatal):",
-      error,
-    );
-  }
 }
 
 async function ensureTelegramWebhook(
@@ -133,35 +106,36 @@ function renderErrorResponse(error: unknown): Response {
   });
 }
 
+function setupKvBindings(env: RuntimeBindings): void {
+  const conversations = (env as Record<string, unknown>).CONVERSATIONS as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
+  const tasks = (env as Record<string, unknown>).TASKS as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
+  const longTerm = (env as Record<string, unknown>).LONG_TERM_MEMORY as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
+  if (conversations) { setKvBinding(conversations); setPersonaKv(conversations); setConversationsKv(conversations); setModelCooldownKv(conversations); setChatStateKv(conversations); }
+  if (tasks) setTasksKv(tasks);
+  if (longTerm) setLongTermKv(longTerm);
+}
+
 export default {
-  async scheduled(_event: unknown, env: RuntimeBindings): Promise<void> {
+  async scheduled(event: {cron?: string}, env: RuntimeBindings, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
     setRuntimeEnv(env);
-    const conversations = (env as Record<string, unknown>).CONVERSATIONS as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
-    const tasks = (env as Record<string, unknown>).TASKS as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
-    const longTerm = (env as Record<string, unknown>).LONG_TERM_MEMORY as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
-    if (conversations) { setKvBinding(conversations); setPersonaKv(conversations); setConversationsKv(conversations); setModelCooldownKv(conversations); }
-    if (tasks) setTasksKv(tasks);
-    if (longTerm) setLongTermKv(longTerm);
+    setupKvBindings(env);
     await checkDueTasks();
     await handleMorningBriefing();
+
+    const cron = event.cron ?? "";
+    if (cron.includes("0 3 * * 1")) {
+      ctx.waitUntil(handleWeeklyAnalytics());
+    }
+
+    ctx.waitUntil(processDuePendingReplies());
   },
 
-  async fetch(request: Request, env: RuntimeBindings): Promise<Response> {
+  async fetch(request: Request, env: RuntimeBindings, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<Response> {
     try {
       setRuntimeEnv(env);
-      const conversations = (env as Record<string, unknown>).CONVERSATIONS as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
-      const tasks = (env as Record<string, unknown>).TASKS as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
-      const longTerm = (env as Record<string, unknown>).LONG_TERM_MEMORY as {get: (key: string) => Promise<string | null>; put: (key: string, value: string) => Promise<void>} | undefined;
-      if (conversations) {
-        setKvBinding(conversations);
-        setPersonaKv(conversations);
-        setConversationsKv(conversations);
-        setModelCooldownKv(conversations);
-      }
-      if (tasks) setTasksKv(tasks);
-      if (longTerm) setLongTermKv(longTerm);
+      setupKvBindings(env);
       const bot = getBot();
-      await ensureCommands(bot);
+      await registerPublicCommands(bot);
       const url = new URL(request.url);
 
       if (url.pathname === '/' || url.pathname === '') {
@@ -183,7 +157,9 @@ export default {
       }
 
       if (url.pathname === '/api/webhooks/telegram' && request.method === 'POST') {
-        return webhookCallback(bot, 'cloudflare-mod', { timeoutMilliseconds: 25000 })(request, env);
+        const response = await webhookCallback(bot, 'cloudflare-mod', { timeoutMilliseconds: 25000 })(request, env);
+        ctx.waitUntil(processDuePendingReplies());
+        return response;
       }
 
       // Direct API test - send a test message (used for debugging)
