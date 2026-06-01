@@ -26,6 +26,7 @@ export async function webSearch(query: string): Promise<SearchResult[] | null> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({q: query, num: 3}),
+      signal: AbortSignal.timeout(5000),
     });
 
     if (!res.ok) {

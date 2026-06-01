@@ -79,6 +79,7 @@ async function sendBusinessMessage(businessConnectionId: string, chatId: number,
         text,
         link_preview_options: {is_disabled: true},
       }),
+      signal: AbortSignal.timeout(10000),
     });
     return res.ok;
   } catch {
@@ -93,8 +94,12 @@ export function setupTelegramHandlers(bot: Bot) {
     const hasBusiness = !!(update.business_connection || update.business_message || update.edited_business_message);
     console.log(`[Router] msg="${(ctx.message?.text ?? "").slice(0, 60)}" | business=${hasBusiness} | type=${ctx.chat?.type ?? "?"}`);
     if (hasBusiness) {
-      const {handleBusinessUpdate} = await import("./business.js");
-      await handleBusinessUpdate(bot, update);
+      try {
+        const {handleBusinessUpdate} = await import("./business.js");
+        await handleBusinessUpdate(bot, update);
+      } catch (e) {
+        console.error(`[Router] Business update failed:`, e);
+      }
       return;
     }
     await next();
@@ -596,10 +601,20 @@ export function setupTelegramHandlers(bot: Bot) {
     }
   });
 
-  // ── DM text handler (same as before) ──
+  // ── DM text handler ──
+  const lastDmTime = new Map<number, number>();
+
   bot.on("message:text", async (ctx) => {
     if (!ctx.chat || !ctx.from) return;
     if (ctx.chat.type !== "private") return;
+
+    const now = Date.now();
+    const lastTime = lastDmTime.get(ctx.chat.id) ?? 0;
+    if (now - lastTime < 500) {
+      console.log(`[Router] DM: rate limited (${ctx.from.first_name || "?"}), ignoring`);
+      return;
+    }
+    lastDmTime.set(ctx.chat.id, now);
 
     const text = ctx.message.text ?? "";
     if (!text.trim()) return;

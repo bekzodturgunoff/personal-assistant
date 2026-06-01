@@ -24,6 +24,9 @@ export const config = {
   get searchApiKey() {
     return getEnv("SEARCH_API_KEY") || "";
   },
+  get webhookSecret() {
+    return getEnv("TELEGRAM_WEBHOOK_SECRET") || "";
+  },
   /**
    * Your personal Telegram user ID (numeric).
    * Used for:

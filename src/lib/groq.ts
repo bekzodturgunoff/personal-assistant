@@ -45,6 +45,7 @@ async function callGroqModel(
         max_tokens: jsonMode ? 1024 : 512,
         ...(jsonMode ? {response_format: {type: "json_object"}} : {}),
       }),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!res.ok) {

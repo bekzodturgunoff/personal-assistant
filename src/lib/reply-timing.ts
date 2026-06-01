@@ -59,29 +59,48 @@ export function calculateReplyAt(state: ChatTimingState, now: number): number {
   return now + MIN_NORMAL_REPLY_DELAY_MS + randomExtra();
 }
 
-const PENDING_LIST_KEY = "_pending_replies";
+function pendingKey(chatId: number): string {
+  return `pending:${chatId}`;
+}
 
 export async function addPendingReply(kv: KvStore, reply: PendingReply): Promise<void> {
-  const raw = await kv.get(PENDING_LIST_KEY);
-  const list: PendingReply[] = raw ? JSON.parse(raw) : [];
-  const filtered = list.filter((r) => r.chatId !== reply.chatId);
-  filtered.push(reply);
-  await kv.put(PENDING_LIST_KEY, JSON.stringify(filtered));
+  await kv.put(pendingKey(reply.chatId), JSON.stringify(reply));
 }
 
 export async function getDuePendingReplies(kv: KvStore, now: number): Promise<PendingReply[]> {
-  const raw = await kv.get(PENDING_LIST_KEY);
-  if (!raw) return [];
-  const list: PendingReply[] = JSON.parse(raw);
-  return list.filter((r) => r.replyAfter <= now || r.isUrgent);
+  if (!kv.list) return [];
+
+  const result = await kv.list({prefix: "pending:"});
+  const due: PendingReply[] = [];
+
+  for (const key of result.keys) {
+    try {
+      const raw = await kv.get(key.name);
+      if (!raw) continue;
+      const reply = JSON.parse(raw) as PendingReply;
+      if (reply.replyAfter <= now || reply.isUrgent) {
+        due.push(reply);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return due;
 }
 
 export async function removePendingReply(kv: KvStore, chatId: number): Promise<void> {
-  const raw = await kv.get(PENDING_LIST_KEY);
-  if (!raw) return;
-  const list: PendingReply[] = JSON.parse(raw);
-  const filtered = list.filter((r) => r.chatId !== chatId);
-  await kv.put(PENDING_LIST_KEY, JSON.stringify(filtered));
+  await kv.delete?.(pendingKey(chatId));
+}
+
+export async function getPendingReply(kv: KvStore, chatId: number): Promise<PendingReply | null> {
+  try {
+    const raw = await kv.get(pendingKey(chatId));
+    if (!raw) return null;
+    return JSON.parse(raw) as PendingReply;
+  } catch {
+    return null;
+  }
 }
 
 export function formatTashkentTime(): string {

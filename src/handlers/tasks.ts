@@ -164,6 +164,7 @@ export async function checkDueTasks(): Promise<void> {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({chat_id: Number(ownerId), text: `Overdue tasks:\n${msg}`}),
+      signal: AbortSignal.timeout(10000),
     });
   } catch (e) {
     console.error("Failed to send task reminder:", e);
@@ -259,6 +260,7 @@ export async function handleMorningBriefing(): Promise<void> {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({chat_id: Number(ownerId), text: msg}),
+      signal: AbortSignal.timeout(10000),
     });
   } catch (e) {
     console.error("Morning briefing error:", e);
@@ -277,6 +279,7 @@ export async function handleWeeklyAnalytics(): Promise<void> {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({chat_id: Number(ownerId), text: msg}),
+      signal: AbortSignal.timeout(10000),
     });
   } catch (e) {
     console.error("Weekly analytics error:", e);

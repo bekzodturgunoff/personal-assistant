@@ -114,6 +114,7 @@ async function readBusinessMessage(connectionId: string, chatId: number, message
         chat_id: chatId,
         message_id: messageId,
       }),
+      signal: AbortSignal.timeout(5000),
     });
   } catch (e) {
     console.error("[Business] Failed to mark as read:", e);
@@ -138,6 +139,7 @@ async function sendWithTyping(connectionId: string, chatId: number, text: string
         chat_id: chatId,
         action: "typing",
       }),
+      signal: AbortSignal.timeout(5000),
     });
   } catch (e) {
     console.error("[Business] Failed to send typing action:", e);
@@ -155,6 +157,7 @@ async function sendWithTyping(connectionId: string, chatId: number, text: string
         text,
         link_preview_options: {is_disabled: true},
       }),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) {
@@ -182,23 +185,33 @@ async function alertOwnerAboutHandoff(chatId: number, senderName: string): Promi
         chat_id: ownerId,
         text: `⚠️ Handoff needed: I'm stuck in conversation with ${senderName} (chat ${chatId}). Low confidence on 3+ replies. Please take over.`,
       }),
+      signal: AbortSignal.timeout(10000),
     });
   } catch (e) {
     console.error("[Business] Failed to alert owner:", e);
   }
 }
 
+let isProcessingReplies = false;
+
 export async function processDuePendingReplies(): Promise<void> {
-  const kv = getConversationsKv();
-  if (!kv) return;
+  if (isProcessingReplies) {
+    console.log("[Business] Already processing replies, skipping concurrent call");
+    return;
+  }
+  isProcessingReplies = true;
 
-  const now = Date.now();
-  const due = await getDuePendingReplies(kv, now);
-  if (due.length === 0) return;
+  try {
+    const kv = getConversationsKv();
+    if (!kv) { isProcessingReplies = false; return; }
 
-  console.log(`[Business] Processing ${due.length} due pending replies`);
+    const now = Date.now();
+    const due = await getDuePendingReplies(kv, now);
+    if (due.length === 0) { isProcessingReplies = false; return; }
 
-  for (const pending of due) {
+    console.log(`[Business] Processing ${due.length} due pending replies`);
+
+    for (const pending of due) {
     try {
       if (await isChatMuted(pending.chatId)) {
         console.log(`[Business] Chat ${pending.chatId} is muted, skipping pending reply`);
@@ -347,6 +360,9 @@ export async function processDuePendingReplies(): Promise<void> {
     } catch (e) {
       console.error(`[Business] Failed to process pending reply for chat ${pending.chatId}:`, e);
     }
+  }
+  } finally {
+    isProcessingReplies = false;
   }
 }
 

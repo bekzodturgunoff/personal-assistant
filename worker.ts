@@ -1,13 +1,14 @@
 import {webhookCallback} from "grammy/web";
 import {createBot, registerPublicCommands} from "./src/bot.js";
 import {config} from "./src/config.js";
-import {setRuntimeEnv} from "./src/runtime-env.js";
+import {setRuntimeEnv, getEnv} from "./src/runtime-env.js";
 import {setKvBinding} from "./src/conversation-memory.js";
 import {setKvBinding as setPersonaKv} from "./src/persona-memory.js";
 import {setConversationsKv, setTasksKv, setLongTermKv, setModelCooldownKv} from "./src/lib/kv-store.js";
 import {setChatStateKv} from "./src/lib/chat-state.js";
 import {handleMorningBriefing, handleWeeklyAnalytics, checkDueTasks} from "./src/handlers/tasks.js";
 import {processDuePendingReplies} from "./src/handlers/business.js";
+
 
 type RuntimeBindings = Record<string, unknown>;
 
@@ -27,10 +28,12 @@ async function ensureTelegramWebhook(
   const webhookUrl = `${origin.replace(/\/+$/, "")}/api/webhooks/telegram`;
 
   try {
+    const secretToken = config.webhookSecret || undefined;
     await bot.api.setWebhook(webhookUrl, {
       drop_pending_updates: true,
+      secret_token: secretToken,
     });
-    console.log(`Telegram webhook set to ${webhookUrl}`);
+    console.log(`Telegram webhook set to ${webhookUrl}${secretToken ? " with secret token" : ""}`);
   } catch (error) {
     console.warn("Failed to set Telegram webhook:", error);
   }
@@ -157,29 +160,39 @@ export default {
       }
 
       if (url.pathname === '/api/webhooks/telegram' && request.method === 'POST') {
+        const secretToken = config.webhookSecret;
+        if (secretToken && request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== secretToken) {
+          return new Response('Unauthorized', { status: 401 });
+        }
         const response = await webhookCallback(bot, 'cloudflare-mod', { timeoutMilliseconds: 25000 })(request, env);
         ctx.waitUntil(processDuePendingReplies());
         return response;
       }
 
-      // Direct API test - send a test message (used for debugging)
-      if (url.pathname === '/debug/send' && request.method === 'POST') {
-        try {
-          const body = await request.json() as { chat_id?: number; text?: string };
-          if (!body.chat_id) {
-            return Response.json({ error: 'chat_id is required' }, { status: 400 });
+      // Debug endpoints — only when DEBUG_ENABLED=true
+      if (getEnv("DEBUG_ENABLED") === "true") {
+        if (url.pathname === '/debug/send' && request.method === 'POST') {
+          try {
+            const body = await request.json() as { chat_id?: number; text?: string };
+            if (!body.chat_id) {
+              return Response.json({ error: 'chat_id is required' }, { status: 400 });
+            }
+            const res = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chat_id: body.chat_id, text: body.text || 'test' }),
+              signal: AbortSignal.timeout(10000),
+            });
+            const data = await res.json();
+            return Response.json(data);
+          } catch (error) {
+            console.error('Raw send error:', error);
+            return Response.json({ error: String(error) }, { status: 500 });
           }
-          const res = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: body.chat_id, text: body.text || 'test' }),
-          });
-          const data = await res.json();
-          console.log('Raw send result:', JSON.stringify(data));
-          return Response.json(data);
-        } catch (error) {
-          console.error('Raw send error:', error);
-          return Response.json({ error: String(error) }, { status: 500 });
+        }
+
+        if (url.pathname === '/debug/telegram') {
+          return getTelegramDebugInfo(bot, url.origin);
         }
       }
 
