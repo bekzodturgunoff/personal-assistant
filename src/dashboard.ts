@@ -410,11 +410,11 @@ export function renderDashboardPage(): Response {
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Bot Dashboard</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   .container { max-width: 960px; margin: 0 auto; }
   h1 { font-size: 1.5rem; margin-bottom: 24px; color: #f8fafc; }
   h2 { font-size: 1.1rem; margin-bottom: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -462,7 +462,25 @@ export function renderDashboardPage(): Response {
   .login-box .error { color: #f87171; font-size: 0.8rem; margin-top: 8px; display: none; }
   .dashboard { display: none; }
   .loading { color: #64748b; font-style: italic; padding: 20px; text-align: center; }
-  @media (max-width: 600px) { .grid { grid-template-columns: 1fr 1fr; } body { padding: 12px; } }
+  @media (max-width: 768px) {
+  body { padding: 12px; }
+  .container { padding: 0; }
+  .grid { grid-template-columns: 1fr; }
+  .card { padding: 14px; }
+  .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; gap: 2px; }
+  .tab { white-space: nowrap; padding: 10px 12px; font-size: 0.8rem; }
+  .card-header { flex-wrap: wrap; gap: 8px; }
+  input, select, textarea, button { font-size: 16px !important; }
+  .login-box { max-width: 100%; margin: 0 8px; }
+  [style*="grid-template-columns:"] { grid-template-columns: 1fr !important; }
+  .input-group { flex-wrap: wrap; }
+  .input-group input { flex: 1 1 100%; }
+  .btn { min-height: 44px; justify-content: center; }
+  .stat-value { font-size: 1.25rem; }
+  h1 { font-size: 1.25rem; }
+  table { font-size: 0.75rem; }
+  th, td { padding: 6px 6px 6px 0; }
+}
 </style>
 </head>
 <body>
@@ -1089,14 +1107,14 @@ function renderSettings(s) {
   document.getElementById("set-voice-humor").value = s.voice?.humor || "";
   document.getElementById("set-voice-style").value = s.voice?.style || "";
   document.getElementById("set-voice-language").value = s.voice?.language || "";
-  document.getElementById("set-voice-features").value = (s.voice?.features || []).join("\n");
+  document.getElementById("set-voice-features").value = (s.voice?.features || []).join("\\n");
 
-  document.getElementById("set-absolute-rules").value = (s.absoluteRules || []).join("\n");
-  document.getElementById("set-never-say").value = (s.neverSay || []).join("\n");
-  document.getElementById("set-behavior-rules").value = (s.behaviorRules || []).join("\n");
-  document.getElementById("set-fallback-rules").value = (s.fallbackRules || []).join("\n");
+  document.getElementById("set-absolute-rules").value = (s.absoluteRules || []).join("\\n");
+  document.getElementById("set-never-say").value = (s.neverSay || []).join("\\n");
+  document.getElementById("set-behavior-rules").value = (s.behaviorRules || []).join("\\n");
+  document.getElementById("set-fallback-rules").value = (s.fallbackRules || []).join("\\n");
 
-  document.getElementById("set-contact").value = (s.businessMode?.contact || []).join("\n");
+  document.getElementById("set-contact").value = (s.businessMode?.contact || []).join("\\n");
   document.getElementById("set-business-tone").value = s.businessMode?.tone || "";
 
   // Reply Timing
@@ -1112,7 +1130,7 @@ function renderSettings(s) {
   const conf = s.confidence || {};
   document.getElementById("set-conf-enabled").value = conf.enabled !== false ? "true" : "false";
   document.getElementById("set-conf-threshold").value = conf.fallbackThreshold ?? 0.65;
-  document.getElementById("set-conf-phrases").value = (conf.fallbackPhrases || []).join("\n");
+  document.getElementById("set-conf-phrases").value = (conf.fallbackPhrases || []).join("\\n");
 
   // Low conf alert
   document.getElementById("set-lowconf-threshold").value = s.lowConfAlertThreshold ?? 3;
@@ -1130,7 +1148,7 @@ function renderSettings(s) {
   document.getElementById("set-brain-interval").value = s.brainAnalysisInterval ?? 4;
 
   // AI fallbacks
-  document.getElementById("set-ai-fallbacks").value = (s.aiFallbackPhrases || []).join("\n");
+  document.getElementById("set-ai-fallbacks").value = (s.aiFallbackPhrases || []).join("\\n");
 
   // Other
   document.getElementById("set-group-cooldown").value = s.groupReplyCooldownMs ?? 12000;
@@ -1190,14 +1208,14 @@ function collectSettings() {
       humor: document.getElementById("set-voice-humor").value.trim(),
       style: document.getElementById("set-voice-style").value.trim(),
       language: document.getElementById("set-voice-language").value.trim(),
-      features: document.getElementById("set-voice-features").value.split("\n").map((s) => s.trim()).filter(Boolean),
+      features: document.getElementById("set-voice-features").value.split("\\n").map((s) => s.trim()).filter(Boolean),
     },
-    absoluteRules: document.getElementById("set-absolute-rules").value.split("\n").map((s) => s.trim()).filter(Boolean),
-    neverSay: document.getElementById("set-never-say").value.split("\n").map((s) => s.trim()).filter(Boolean),
-    behaviorRules: document.getElementById("set-behavior-rules").value.split("\n").map((s) => s.trim()).filter(Boolean),
-    fallbackRules: document.getElementById("set-fallback-rules").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    absoluteRules: document.getElementById("set-absolute-rules").value.split("\\n").map((s) => s.trim()).filter(Boolean),
+    neverSay: document.getElementById("set-never-say").value.split("\\n").map((s) => s.trim()).filter(Boolean),
+    behaviorRules: document.getElementById("set-behavior-rules").value.split("\\n").map((s) => s.trim()).filter(Boolean),
+    fallbackRules: document.getElementById("set-fallback-rules").value.split("\\n").map((s) => s.trim()).filter(Boolean),
     businessMode: {
-      contact: document.getElementById("set-contact").value.split("\n").map((s) => s.trim()).filter(Boolean),
+      contact: document.getElementById("set-contact").value.split("\\n").map((s) => s.trim()).filter(Boolean),
       tone: document.getElementById("set-business-tone").value.trim(),
     },
     commands: settingsCommands,
@@ -1212,7 +1230,7 @@ function collectSettings() {
     confidence: {
       enabled: document.getElementById("set-conf-enabled").value === "true",
       fallbackThreshold: parseFloat(document.getElementById("set-conf-threshold").value) || 0.65,
-      fallbackPhrases: document.getElementById("set-conf-phrases").value.split("\n").map((s) => s.trim()).filter(Boolean),
+      fallbackPhrases: document.getElementById("set-conf-phrases").value.split("\\n").map((s) => s.trim()).filter(Boolean),
       clarifiers: state.settings?.confidence?.clarifiers || {},
     },
     lowConfAlertThreshold: parseInt(document.getElementById("set-lowconf-threshold").value) || 3,
@@ -1222,7 +1240,7 @@ function collectSettings() {
     maxResponseSentences: parseInt(document.getElementById("set-max-sentences").value) || 3,
     brainAnalysisEnabled: document.getElementById("set-brain-enabled").value === "true",
     brainAnalysisInterval: parseInt(document.getElementById("set-brain-interval").value) || 4,
-    aiFallbackPhrases: document.getElementById("set-ai-fallbacks").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    aiFallbackPhrases: document.getElementById("set-ai-fallbacks").value.split("\\n").map((s) => s.trim()).filter(Boolean),
     groupReplyCooldownMs: parseInt(document.getElementById("set-group-cooldown").value) || 12000,
     returningContactDays: parseInt(document.getElementById("set-returning-days").value) || 7,
   };
