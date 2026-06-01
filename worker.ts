@@ -144,6 +144,9 @@ export default {
 
       if (url.pathname === '/' || url.pathname === '') {
         await ensureTelegramWebhook(bot, url.origin);
+        if (config.dashboardPassword) {
+          return Response.redirect(`${url.origin}/api/dashboard`, 302);
+        }
         return renderHomePage();
       }
 
@@ -174,7 +177,10 @@ export default {
       if (url.pathname.startsWith("/api/dashboard")) {
         const pw = config.dashboardPassword;
         if (!pw) {
-          return new Response("Dashboard disabled (DASHBOARD_PASSWORD not set)", { status: 404 });
+          return new Response('Dashboard disabled. Set DASHBOARD_PASSWORD in environment variables.', {
+            status: 404,
+            headers: {"content-type": "text/plain; charset=utf-8"},
+          });
         }
         if (url.pathname === "/api/dashboard" || url.pathname === "/api/dashboard/") {
           return renderDashboardPage();
