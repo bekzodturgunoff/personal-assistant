@@ -224,6 +224,10 @@ export default {
         }
       }
 
+      if (url.pathname === '/favicon.ico') {
+        return new Response(null, { status: 204 });
+      }
+
       return new Response('Not found', { status: 404 });
     } catch (error) {
       console.error('Worker fetch error:', error);

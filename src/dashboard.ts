@@ -873,15 +873,26 @@ function getHeaders() {
 function login() {
   const user = document.getElementById("username-input").value;
   const pw = document.getElementById("password-input").value;
+  if (!user || !pw) return toast("Enter username and password", true);
+  document.getElementById("login-error").style.display = "none";
   token = user + ":" + pw;
   sessionStorage.setItem("dash_token", token);
-  fetchData().then(ok => {
-    if (!ok) {
-      document.getElementById("login-error").style.display = "block";
-      sessionStorage.removeItem("dash_token");
-      token = "";
-    }
+  loginAttempt().catch(() => {
+    document.getElementById("login-error").style.display = "block";
+    sessionStorage.removeItem("dash_token");
+    token = "";
   });
+}
+
+async function loginAttempt() {
+  const res = await authFetch("/api/dashboard/data");
+  if (res.ok) {
+    fetchData();
+    return;
+  }
+  if (res.status === 401) throw new Error("bad auth");
+  const text = await res.text().catch(() => "unknown error");
+  toast("Server error: " + text.slice(0, 200), true);
 }
 
 async function authFetch(url, opts = {}) {
@@ -894,6 +905,9 @@ async function authFetch(url, opts = {}) {
     document.getElementById("login-screen").style.display = "flex";
     document.getElementById("dashboard").style.display = "none";
     document.getElementById("login-error").style.display = "block";
+  }
+  if (res.status === 500) {
+    console.error("Server error on", url);
   }
   return res;
 }
@@ -920,7 +934,11 @@ async function fetchData() {
 }
 
 // Auto-login if token exists
-if (token) fetchData();
+if (token) fetchData().then(ok => {
+  if (!ok && document.getElementById("login-screen").style.display !== "flex") {
+    toast("Failed to load dashboard. Check console.", true);
+  }
+});
 
 function render() {
   renderWeeklyStats();
