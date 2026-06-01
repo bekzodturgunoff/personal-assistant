@@ -1,4 +1,5 @@
 import type {KvStore} from "./kv-store.js";
+import {getCachedSettings} from "./bot-settings.js";
 
 let kvBinding: KvStore | null = null;
 
@@ -6,7 +7,6 @@ export function setChatStateKv(kv: KvStore): void {
   kvBinding = kv;
 }
 
-const GROUP_REPLY_COOLDOWN_MS = 12_000;
 const lastGroupReplyAt = new Map<number, number>();
 
 function muteKey(chatId: number): string {
@@ -39,10 +39,11 @@ export async function unmuteChat(chatId: number): Promise<void> {
   }
 }
 
-export function canReplyInGroup(chatId: number): boolean {
+export async function canReplyInGroup(chatId: number): Promise<boolean> {
+  const settings = await getCachedSettings();
   const now = Date.now();
   const lastReplyAt = lastGroupReplyAt.get(chatId) ?? 0;
-  if (now - lastReplyAt < GROUP_REPLY_COOLDOWN_MS) {
+  if (now - lastReplyAt < settings.groupReplyCooldownMs) {
     return false;
   }
   lastGroupReplyAt.set(chatId, now);

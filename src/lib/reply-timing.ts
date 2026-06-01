@@ -1,10 +1,5 @@
 import type {KvStore} from "./kv-store.js";
-
-const CONVERSATION_GAP_MS = 30 * 60 * 1000;
-const MIN_FIRST_REPLY_DELAY_MS = 4 * 60 * 1000;
-const MIN_SLOW_REPLY_DELAY_MS = 4 * 60 * 1000;
-const MIN_NORMAL_REPLY_DELAY_MS = 90 * 1000;
-const SLOW_THRESHOLD_MS = 3 * 60 * 1000;
+import {getCachedSettings} from "./bot-settings.js";
 
 export interface ChatTimingState {
   lastIncomingAt: number;
@@ -24,10 +19,6 @@ export interface PendingReply {
   isUrgent: boolean;
 }
 
-function randomExtra(): number {
-  return Math.floor(Math.random() * 120_000);
-}
-
 export function getDefaultTimingState(): ChatTimingState {
   return {lastIncomingAt: 0, lastOutgoingAt: 0, conversationStartedAt: 0, messageCount: 0};
 }
@@ -41,22 +32,32 @@ export async function saveTimingState(kv: KvStore, chatId: number, state: ChatTi
   await kv.put(`timing:${chatId}`, JSON.stringify(state));
 }
 
-export function calculateReplyAt(state: ChatTimingState, now: number): number {
+export async function calculateReplyAt(state: ChatTimingState, now: number): Promise<number> {
+  const settings = await getCachedSettings();
+  const t = settings.replyTiming;
+
+  const conversationGapMs = t.conversationGapMinutes * 60 * 1000;
+  const firstReplyDelayMs = t.firstReplyDelaySeconds * 1000;
+  const slowReplyDelayMs = t.slowReplyDelaySeconds * 1000;
+  const normalReplyDelayMs = t.normalReplyDelaySeconds * 1000;
+  const slowThresholdMs = t.slowThresholdSeconds * 1000;
+  const randomExtraMs = Math.floor(Math.random() * t.randomExtraMaxSeconds * 1000);
+
   const timeSinceLastOutgoing = state.lastOutgoingAt > 0 ? now - state.lastOutgoingAt : Infinity;
-  const isNewConversation = timeSinceLastOutgoing > CONVERSATION_GAP_MS || state.messageCount === 0;
+  const isNewConversation = timeSinceLastOutgoing > conversationGapMs || state.messageCount === 0;
 
   if (isNewConversation) {
-    return now + MIN_FIRST_REPLY_DELAY_MS + randomExtra();
+    return now + firstReplyDelayMs + randomExtraMs;
   }
 
   if (state.lastOutgoingAt > 0 && state.lastIncomingAt > state.lastOutgoingAt) {
     const otherPersonReplyTime = state.lastIncomingAt - state.lastOutgoingAt;
-    if (otherPersonReplyTime > SLOW_THRESHOLD_MS) {
-      return now + MIN_SLOW_REPLY_DELAY_MS + randomExtra();
+    if (otherPersonReplyTime > slowThresholdMs) {
+      return now + slowReplyDelayMs + randomExtraMs;
     }
   }
 
-  return now + MIN_NORMAL_REPLY_DELAY_MS + randomExtra();
+  return now + normalReplyDelayMs + randomExtraMs;
 }
 
 function pendingKey(chatId: number): string {

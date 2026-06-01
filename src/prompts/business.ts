@@ -242,7 +242,8 @@ export async function businessAssistantReply(
 
   const result = await callGeminiStructured(finalPrompt);
 
-  result.text = limitResponse(result.text, 500, 3);
+  const settings = await getSettings();
+  result.text = limitResponse(result.text, settings.maxResponseChars, settings.maxResponseSentences);
   console.log(`[BusinessAssistant] response ready — ${result.text.slice(0, 80)}... (conf=${result.confidence}, factual=${result.isFactualClaim})`);
   return result;
 }

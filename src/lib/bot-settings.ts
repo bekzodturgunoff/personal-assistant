@@ -3,6 +3,9 @@ import personaDefaults from "../persona.json" with {type: "json"};
 
 const SETTINGS_KEY = "_settings";
 
+let cache: {settings: BotSettings; identityPrompt: string; ts: number} | null = null;
+const CACHE_TTL = 30_000;
+
 export interface BotSettings {
   name: string;
   ownerName: string;
@@ -27,6 +30,30 @@ export interface BotSettings {
   commands: Array<{command: string; description: string}>;
   objectionHandling: Record<string, string>;
   skipReplyPatterns: string[];
+  replyTiming: {
+    conversationGapMinutes: number;
+    firstReplyDelaySeconds: number;
+    slowReplyDelaySeconds: number;
+    normalReplyDelaySeconds: number;
+    slowThresholdSeconds: number;
+    randomExtraMaxSeconds: number;
+  };
+  confidence: {
+    enabled: boolean;
+    fallbackThreshold: number;
+    fallbackPhrases: string[];
+    clarifiers: Record<string, string[]>;
+  };
+  lowConfAlertThreshold: number;
+  typingMsPerChar: number;
+  typingMaxMs: number;
+  groupReplyCooldownMs: number;
+  maxResponseChars: number;
+  maxResponseSentences: number;
+  brainAnalysisInterval: number;
+  brainAnalysisEnabled: boolean;
+  aiFallbackPhrases: string[];
+  returningContactDays: number;
 }
 
 export function getDefaultSettings(): BotSettings {
@@ -69,20 +96,71 @@ export function getDefaultSettings(): BotSettings {
     ],
     objectionHandling: (p.objection_handling as Record<string, string>) || {},
     skipReplyPatterns: (p.skip_reply_patterns as string[]) || [],
+    replyTiming: {
+      conversationGapMinutes: 30,
+      firstReplyDelaySeconds: 240,
+      slowReplyDelaySeconds: 240,
+      normalReplyDelaySeconds: 90,
+      slowThresholdSeconds: 180,
+      randomExtraMaxSeconds: 120,
+    },
+    confidence: {
+      enabled: true,
+      fallbackThreshold: 0.65,
+      fallbackPhrases: [
+        "men tekshirib beraman",
+        "aniqlab beraman, biroz kuting",
+        "hozir bilib olaman",
+      ],
+      clarifiers: {
+        price_inquiry: [
+          "Bu qaysi mahsulot uchun edi?",
+          "Qancha miqdor kerak edi?",
+          "Qachonga kerak?",
+        ],
+        request: [
+          "Aniqroq aytib bera olasizmi?",
+          "Qachonga kerak?",
+        ],
+      },
+    },
+    lowConfAlertThreshold: 3,
+    typingMsPerChar: 45,
+    typingMaxMs: 4000,
+    groupReplyCooldownMs: 12000,
+    maxResponseChars: 500,
+    maxResponseSentences: 3,
+    brainAnalysisInterval: 4,
+    brainAnalysisEnabled: true,
+    aiFallbackPhrases: [
+      "Hozir bandman, keyinroq javob beraman",
+      "Sal gaplashamiz keyin, hozir ish bilan bandman",
+      "Keyinroq yozaman, hozir biroz band",
+      "Hozir qo'lim tegmayapti, keyin albatta javob beraman",
+      "Hozir boshqa ish bilan bandman, keyin yozaman",
+    ],
+    returningContactDays: 7,
   };
 }
 
 export async function getBotSettings(): Promise<BotSettings> {
+  if (cache && Date.now() - cache.ts < CACHE_TTL) {
+    return cache.settings;
+  }
   const kv = getLongTermKv();
   if (!kv) return getDefaultSettings();
   try {
     const raw = await kv.get(SETTINGS_KEY);
-    if (!raw) return getDefaultSettings();
-    const saved = JSON.parse(raw) as Partial<BotSettings>;
+    const saved = raw ? (JSON.parse(raw) as Partial<BotSettings>) : {};
     const defaults = getDefaultSettings();
-    return {...defaults, ...saved};
+    const merged = deepMerge(defaults as unknown as Record<string, unknown>, saved as unknown as Record<string, unknown>) as unknown as BotSettings;
+    cache = {settings: merged, identityPrompt: "", ts: Date.now()};
+    cache.identityPrompt = buildIdentityPromptSync(merged);
+    return merged;
   } catch {
-    return getDefaultSettings();
+    const d = getDefaultSettings();
+    cache = {settings: d, identityPrompt: buildIdentityPromptSync(d), ts: Date.now()};
+    return d;
   }
 }
 
@@ -90,9 +168,37 @@ export async function saveBotSettings(settings: BotSettings): Promise<void> {
   const kv = getLongTermKv();
   if (!kv) return;
   await kv.put(SETTINGS_KEY, JSON.stringify(settings));
+  cache = null;
 }
 
-export async function buildIdentityPrompt(settings: BotSettings): Promise<string> {
+export async function getCachedSettings(): Promise<BotSettings> {
+  return getBotSettings();
+}
+
+function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+  if (!source) return target;
+  const result = {...target};
+  for (const key of Object.keys(source)) {
+    if (source[key] !== undefined && source[key] !== null) {
+      if (
+        typeof source[key] === "object" &&
+        !Array.isArray(source[key]) &&
+        typeof target[key] === "object" &&
+        !Array.isArray(target[key])
+      ) {
+        result[key] = deepMerge(
+          target[key] as Record<string, unknown>,
+          source[key] as Record<string, unknown>,
+        );
+      } else {
+        result[key] = source[key];
+      }
+    }
+  }
+  return result;
+}
+
+function buildIdentityPromptSync(settings: BotSettings): string {
   const neverSayBlock = settings.neverSay.length > 0
     ? settings.neverSay.map((s) => `- Never say: "${s}"`).join("\n")
     : "";
@@ -139,4 +245,11 @@ confidence guide:
 Set is_factual_claim: true whenever text contains a price, date, 
 delivery time, product spec, or any hard commitment.
 `.trim();
+}
+
+export async function buildIdentityPrompt(settings?: BotSettings): Promise<string> {
+  if (!settings) {
+    settings = await getBotSettings();
+  }
+  return buildIdentityPromptSync(settings);
 }

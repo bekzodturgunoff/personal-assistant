@@ -418,7 +418,7 @@ export function setupTelegramHandlers(bot: Bot) {
         pendingQuestions: [],
       };
       const geminiResponse = await businessAssistantReply(rest, history, replyCtx);
-      const confidenceCheck = evaluateConfidence(geminiResponse);
+      const confidenceCheck = await evaluateConfidence(geminiResponse);
       const responseText = confidenceCheck.shouldFallback ? confidenceCheck.fallbackPhrase : geminiResponse.text;
       await ctx.reply(
         `🧪 Test sonuci — ${chatId}\n─────────────────────────\n💬 Siz: "${rest}"\n🤖 Bot: "${responseText}"\n📊 Ishonch: ${geminiResponse.confidence}\n🌐 Til: ${intent.detectedLanguage}\n⚡ Shoshilinch: ${intent.estimatedUrgency}`,
@@ -676,7 +676,7 @@ export function setupTelegramHandlers(bot: Bot) {
       const enhanced = await (await import("./search.js")).enhanceWithSearch(text);
       const geminiResponse = await businessAssistantReply(enhanced, history, replyCtx);
 
-      const confidenceCheck = evaluateConfidence(geminiResponse);
+      const confidenceCheck = await evaluateConfidence(geminiResponse);
       const responseText = confidenceCheck.shouldFallback ? confidenceCheck.fallbackPhrase : geminiResponse.text;
 
       if (!responseText) {

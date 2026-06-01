@@ -1,35 +1,35 @@
 import type {GeminiResponse} from "./gemini.js";
+import {getCachedSettings} from "./bot-settings.js";
 
 export interface ConfidenceCheck {
   score: number;
   isFactualClaim: boolean;
   shouldFallback: boolean;
   fallbackPhrase: string;
+  clarifier: string;
 }
 
-const FALLBACKS = [
-  "men tekshirib beraman",
-  "aniqlab beraman, biroz kuting",
-  "hozir bilib olaman",
-];
+export async function evaluateConfidence(geminiResponse: GeminiResponse): Promise<ConfidenceCheck> {
+  const settings = await getCachedSettings();
+  const c = settings.confidence;
 
-function pickFallback(): string {
-  return FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
-}
-
-export function evaluateConfidence(geminiResponse: GeminiResponse): ConfidenceCheck {
   const score = typeof geminiResponse.confidence === "number"
     ? Math.max(0, Math.min(1, geminiResponse.confidence))
     : 1.0;
 
   const isFactualClaim = geminiResponse.isFactualClaim === true;
 
-  const shouldFallback = score < 0.65 && isFactualClaim;
+  const shouldFallback = c.enabled && score < c.fallbackThreshold && isFactualClaim;
+
+  const fallbackPhrase = shouldFallback
+    ? c.fallbackPhrases[Math.floor(Math.random() * c.fallbackPhrases.length)]
+    : "";
 
   return {
     score,
     isFactualClaim,
     shouldFallback,
-    fallbackPhrase: shouldFallback ? pickFallback() : "",
+    fallbackPhrase,
+    clarifier: "",
   };
 }

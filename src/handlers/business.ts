@@ -28,6 +28,7 @@ import {
   getPausedUntil,
   clearPausedUntil,
 } from "../lib/kv-store.js";
+import {getCachedSettings} from "../lib/bot-settings.js";
 
 interface BusinessMessageShape {
   text?: unknown;
@@ -89,8 +90,6 @@ function shouldSkipReply(msg: BusinessMessageShape): boolean {
 
 const TG_API = "https://api.telegram.org/bot";
 
-const LOWCONF_ALERT_THRESHOLD = 3;
-
 let ownerChatId: number | null = null;
 
 function tgApiUrl(method: string): string {
@@ -122,14 +121,14 @@ async function readBusinessMessage(connectionId: string, chatId: number, message
   }
 }
 
-function calculateTypingDuration(text: string): number {
-  const msPerChar = 45;
-  const duration = text.length * msPerChar;
-  return Math.min(Math.max(duration, 0), 4000);
+async function calculateTypingDuration(text: string): Promise<number> {
+  const settings = await getCachedSettings();
+  const duration = text.length * settings.typingMsPerChar;
+  return Math.min(Math.max(duration, 0), settings.typingMaxMs);
 }
 
 async function sendWithTyping(connectionId: string, chatId: number, text: string): Promise<void> {
-  const typingDuration = calculateTypingDuration(text);
+  const typingDuration = await calculateTypingDuration(text);
 
   try {
     await fetch(tgApiUrl("sendChatAction"), {
@@ -246,12 +245,13 @@ export async function processDuePendingReplies(): Promise<void> {
 
       let isReturning = false;
       let daysSinceLastContact = 0;
+      const bizSettings = await getCachedSettings();
       try {
         const userMsgs = history.filter((e) => e.role === "user");
         if (userMsgs.length >= 2) {
           const prevMsg = userMsgs[userMsgs.length - 2];
           daysSinceLastContact = Math.floor((Date.now() - prevMsg.timestamp) / 86400000);
-          isReturning = daysSinceLastContact > 7;
+          isReturning = daysSinceLastContact > bizSettings.returningContactDays;
         }
       } catch (e) {
         console.error("[Business] Error checking returning contact:", e);
@@ -282,14 +282,8 @@ export async function processDuePendingReplies(): Promise<void> {
         );
       } catch (error) {
         console.error(`[Business] AI call FAILED for pending ${pending.senderName} (${pending.chatId}):`, error);
-        const fallbacks = [
-          "Hozir bandman, keyinroq javob beraman",
-          "Sal gaplashamiz keyin, hozir ish bilan bandman",
-          "Keyinroq yozaman, hozir biroz band",
-          "Hozir qo'lim tegmayapti, keyin albatta javob beraman",
-          "Hozir boshqa ish bilan bandman, keyin yozaman",
-        ];
-        const fallbackText = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+        const aiSettings = await getCachedSettings();
+        const fallbackText = aiSettings.aiFallbackPhrases[Math.floor(Math.random() * aiSettings.aiFallbackPhrases.length)];
         await addMessage(pending.chatId, "assistant", fallbackText);
         await recordMessage(pending.chatId, "assistant", fallbackText);
         await sendBusinessReply(pending.connectionId, pending.chatId, fallbackText);
@@ -301,7 +295,7 @@ export async function processDuePendingReplies(): Promise<void> {
         continue;
       }
 
-      const confidenceCheck = evaluateConfidence(geminiResponse);
+      const confidenceCheck = await evaluateConfidence(geminiResponse);
       console.log(`[Business] confidenceCheck: score=${confidenceCheck.score}, factual=${confidenceCheck.isFactualClaim}, fallback=${confidenceCheck.shouldFallback}`);
 
       let responseText: string;
@@ -313,29 +307,19 @@ export async function processDuePendingReplies(): Promise<void> {
         acc.lowConfTotal++;
         await saveWeeklyAccumulator(acc);
 
-        if (meta.lowConfCount >= LOWCONF_ALERT_THRESHOLD) {
+        const settings = await getCachedSettings();
+        if (meta.lowConfCount >= settings.lowConfAlertThreshold) {
           await alertOwnerAboutHandoff(pending.chatId, pending.senderName);
           await updateUserMeta(String(pending.chatId), { lowConfCount: 0 });
         }
 
-        const clarifiers: Record<string, string[]> = {
-          price_inquiry: [
-            "Bu qaysi mahsulot uchun edi?",
-            "Qancha miqdor kerak edi?",
-            "Qachonga kerak?",
-          ],
-          request: [
-            "Aniqroq aytib bera olasizmi?",
-            "Qachonga kerak?",
-          ],
-        };
-        const clarifierOptions = clarifiers[replyCtx.intent];
+        const clarifierOptions = settings.confidence.clarifiers[replyCtx.intent];
         const clarifier = clarifierOptions
           ? clarifierOptions[Math.floor(Math.random() * clarifierOptions.length)]
           : null;
 
         responseText = pending.isUrgent
-          ? "Hozir ko'ryapman, tezda javob beraman"
+          ? settings.confidence.fallbackPhrases[0] || "Hozir ko'ryapman, tezda javob beraman"
           : clarifier
             ? `${confidenceCheck.fallbackPhrase} — ${clarifier}`
             : confidenceCheck.fallbackPhrase;
@@ -457,7 +441,7 @@ export async function handleBusinessUpdate(
       timing.lastOutgoingAt = 0;
     }
 
-    const replyAt = intent.isUrgent ? Date.now() : calculateReplyAt(timing, Date.now());
+    const replyAt = intent.isUrgent ? Date.now() : await calculateReplyAt(timing, Date.now());
     const waitSeconds = Math.round((replyAt - Date.now()) / 1000);
     console.log(`[Business] ${senderName}: reply scheduled in ~${waitSeconds}s (message #${timing.messageCount})${intent.isUrgent ? " [URGENT]" : ""}`);
 

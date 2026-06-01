@@ -694,6 +694,148 @@ export function renderDashboardPage(): Response {
       </div>
     </div>
 
+    <div class="card">
+      <div class="card-header">
+        <h2>Reply Timing</h2>
+      </div>
+      <p style="color:#64748b;font-size:0.8rem;margin-bottom:12px;">Controls how long the bot waits before replying. All values in seconds unless noted.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Conversation gap (minutes)</label>
+          <input type="number" id="set-rt-conversation-gap" min="1" max="1440" />
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">First reply delay (sec)</label>
+          <input type="number" id="set-rt-first-delay" min="0" max="3600" />
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Slow replier delay (sec)</label>
+          <input type="number" id="set-rt-slow-delay" min="0" max="3600" />
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Normal reply delay (sec)</label>
+          <input type="number" id="set-rt-normal-delay" min="0" max="3600" />
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Slow threshold (sec)</label>
+          <input type="number" id="set-rt-slow-threshold" min="0" max="3600" />
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Random extra max (sec)</label>
+          <input type="number" id="set-rt-random-extra" min="0" max="600" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Confidence Scorer</h2>
+      </div>
+      <p style="color:#64748b;font-size:0.8rem;margin-bottom:12px;">When confidence is below threshold AND the AI made a factual claim, it falls back to a safe phrase.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Enabled</label>
+          <select id="set-conf-enabled" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:0.875rem;">
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Fallback threshold (0.0-1.0)</label>
+          <input type="number" id="set-conf-threshold" min="0" max="1" step="0.01" />
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Fallback phrases (one per line)</label>
+        <textarea id="set-conf-phrases" rows="3" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:0.875rem;font-family:monospace;resize:vertical;"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Low Confidence Alerts</h2>
+      </div>
+      <div>
+        <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Alert threshold (consecutive low-conf replies before owner notified)</label>
+        <input type="number" id="set-lowconf-threshold" min="1" max="20" />
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Typing Simulation</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">ms per character</label>
+          <input type="number" id="set-typing-mschar" min="0" max="500" />
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Max typing duration (ms)</label>
+          <input type="number" id="set-typing-maxms" min="0" max="30000" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>AI Response Limits</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Max characters</label>
+          <input type="number" id="set-max-chars" min="50" max="4000" />
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Max sentences</label>
+          <input type="number" id="set-max-sentences" min="1" max="20" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Brain Analysis</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Enabled</label>
+          <select id="set-brain-enabled" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:0.875rem;">
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Analysis interval (every N user messages)</label>
+          <input type="number" id="set-brain-interval" min="1" max="50" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>AI Fallback Messages</h2>
+      </div>
+      <p style="color:#64748b;font-size:0.8rem;margin-bottom:8px;">When AI calls completely fail, one of these is sent randomly.</p>
+      <textarea id="set-ai-fallbacks" rows="4" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:0.875rem;font-family:monospace;resize:vertical;"></textarea>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Other</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Group reply cooldown (ms)</label>
+          <input type="number" id="set-group-cooldown" min="0" max="60000" />
+        </div>
+        <div>
+          <label style="color:#94a3b8;font-size:0.8rem;display:block;margin-bottom:4px;">Returning contact (days)</label>
+          <input type="number" id="set-returning-days" min="1" max="365" />
+        </div>
+      </div>
+    </div>
+
     <div style="display:flex;gap:8px;margin-bottom:20px;">
       <button class="btn primary" onclick="saveSettings()">Save All Settings</button>
     </div>
@@ -957,6 +1099,43 @@ function renderSettings(s) {
   document.getElementById("set-contact").value = (s.businessMode?.contact || []).join("\n");
   document.getElementById("set-business-tone").value = s.businessMode?.tone || "";
 
+  // Reply Timing
+  const rt = s.replyTiming || {};
+  document.getElementById("set-rt-conversation-gap").value = rt.conversationGapMinutes ?? 30;
+  document.getElementById("set-rt-first-delay").value = rt.firstReplyDelaySeconds ?? 240;
+  document.getElementById("set-rt-slow-delay").value = rt.slowReplyDelaySeconds ?? 240;
+  document.getElementById("set-rt-normal-delay").value = rt.normalReplyDelaySeconds ?? 90;
+  document.getElementById("set-rt-slow-threshold").value = rt.slowThresholdSeconds ?? 180;
+  document.getElementById("set-rt-random-extra").value = rt.randomExtraMaxSeconds ?? 120;
+
+  // Confidence
+  const conf = s.confidence || {};
+  document.getElementById("set-conf-enabled").value = conf.enabled !== false ? "true" : "false";
+  document.getElementById("set-conf-threshold").value = conf.fallbackThreshold ?? 0.65;
+  document.getElementById("set-conf-phrases").value = (conf.fallbackPhrases || []).join("\n");
+
+  // Low conf alert
+  document.getElementById("set-lowconf-threshold").value = s.lowConfAlertThreshold ?? 3;
+
+  // Typing
+  document.getElementById("set-typing-mschar").value = s.typingMsPerChar ?? 45;
+  document.getElementById("set-typing-maxms").value = s.typingMaxMs ?? 4000;
+
+  // AI response limits
+  document.getElementById("set-max-chars").value = s.maxResponseChars ?? 500;
+  document.getElementById("set-max-sentences").value = s.maxResponseSentences ?? 3;
+
+  // Brain
+  document.getElementById("set-brain-enabled").value = s.brainAnalysisEnabled !== false ? "true" : "false";
+  document.getElementById("set-brain-interval").value = s.brainAnalysisInterval ?? 4;
+
+  // AI fallbacks
+  document.getElementById("set-ai-fallbacks").value = (s.aiFallbackPhrases || []).join("\n");
+
+  // Other
+  document.getElementById("set-group-cooldown").value = s.groupReplyCooldownMs ?? 12000;
+  document.getElementById("set-returning-days").value = s.returningContactDays ?? 7;
+
   renderCommands(s.commands || []);
 }
 
@@ -1022,6 +1201,30 @@ function collectSettings() {
       tone: document.getElementById("set-business-tone").value.trim(),
     },
     commands: settingsCommands,
+    replyTiming: {
+      conversationGapMinutes: parseInt(document.getElementById("set-rt-conversation-gap").value) || 30,
+      firstReplyDelaySeconds: parseInt(document.getElementById("set-rt-first-delay").value) || 240,
+      slowReplyDelaySeconds: parseInt(document.getElementById("set-rt-slow-delay").value) || 240,
+      normalReplyDelaySeconds: parseInt(document.getElementById("set-rt-normal-delay").value) || 90,
+      slowThresholdSeconds: parseInt(document.getElementById("set-rt-slow-threshold").value) || 180,
+      randomExtraMaxSeconds: parseInt(document.getElementById("set-rt-random-extra").value) || 120,
+    },
+    confidence: {
+      enabled: document.getElementById("set-conf-enabled").value === "true",
+      fallbackThreshold: parseFloat(document.getElementById("set-conf-threshold").value) || 0.65,
+      fallbackPhrases: document.getElementById("set-conf-phrases").value.split("\n").map((s) => s.trim()).filter(Boolean),
+      clarifiers: state.settings?.confidence?.clarifiers || {},
+    },
+    lowConfAlertThreshold: parseInt(document.getElementById("set-lowconf-threshold").value) || 3,
+    typingMsPerChar: parseInt(document.getElementById("set-typing-mschar").value) || 45,
+    typingMaxMs: parseInt(document.getElementById("set-typing-maxms").value) || 4000,
+    maxResponseChars: parseInt(document.getElementById("set-max-chars").value) || 500,
+    maxResponseSentences: parseInt(document.getElementById("set-max-sentences").value) || 3,
+    brainAnalysisEnabled: document.getElementById("set-brain-enabled").value === "true",
+    brainAnalysisInterval: parseInt(document.getElementById("set-brain-interval").value) || 4,
+    aiFallbackPhrases: document.getElementById("set-ai-fallbacks").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    groupReplyCooldownMs: parseInt(document.getElementById("set-group-cooldown").value) || 12000,
+    returningContactDays: parseInt(document.getElementById("set-returning-days").value) || 7,
   };
 }
 

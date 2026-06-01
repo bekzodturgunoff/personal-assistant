@@ -3,6 +3,7 @@ import {BRAIN_OUTPUT_DEFAULTS} from "./types.js";
 import {createGroqBrainProvider} from "./providers/groq-brain.js";
 import {getFullHistory} from "../conversation-memory.js";
 import {getConversationsKv, updateUserMeta, getWeeklyAccumulator, saveWeeklyAccumulator, touchDailyEntry} from "../lib/kv-store.js";
+import {getCachedSettings} from "../lib/bot-settings.js";
 
 let provider: BrainProvider | null = null;
 const brainAnalysisInProgress = new Set<number>();
@@ -20,7 +21,6 @@ export function getBrainProvider(): BrainProvider {
 
 const SUMMARY_KEY_PREFIX = "brain:summary:";
 const BRAIN_OUTPUT_PREFIX = "brain:output:";
-const SUMMARY_INTERVAL = 4;
 
 export async function getConversationSummary(chatId: number): Promise<string> {
   const kv = getConversationsKv();
@@ -69,7 +69,9 @@ export async function runBrainAnalysis(
 
     if (userMessageCount < 2 && !force) return;
 
-    if (!force && userMessageCount % SUMMARY_INTERVAL !== 0 && userMessageCount !== SUMMARY_INTERVAL) return;
+    const settings = await getCachedSettings();
+    if (!settings.brainAnalysisEnabled && !force) return;
+    if (!force && userMessageCount % settings.brainAnalysisInterval !== 0 && userMessageCount !== settings.brainAnalysisInterval) return;
 
     let isReturning = false;
     try {
