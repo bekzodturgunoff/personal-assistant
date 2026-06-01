@@ -173,6 +173,29 @@ export default {
         return response;
       }
 
+      // ── New API routes (Conversations, Commands, Brain, Persona) ──
+      const NEW_API_PREFIXES = ["/api/conversations", "/api/commands", "/api/brain", "/api/persona"];
+      if (NEW_API_PREFIXES.some((p) => url.pathname.startsWith(p))) {
+        const user = config.dashboardUsername;
+        const pw = config.dashboardPassword;
+        if (!user || !pw) {
+          return new Response('API disabled. Set DASHBOARD_USERNAME and DASHBOARD_PASSWORD.', {
+            status: 404,
+            headers: {"content-type": "text/plain; charset=utf-8"},
+          });
+        }
+        const auth = request.headers.get("Authorization") || "";
+        const token = auth.replace(/^Bearer\s+/i, "");
+        if (token !== `${user}:${pw}`) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+        const body = request.method === "PUT" || request.method === "POST" || request.method === "PATCH" ? await request.text() : null;
+        const {handleNonDashboardApi} = await import("./src/dashboard.js");
+        const result = await handleNonDashboardApi(url.pathname, request.method, body);
+        if (result) return result;
+        return new Response("Not found", { status: 404 });
+      }
+
       // ── Dashboard ──
       if (url.pathname.startsWith("/api/dashboard")) {
         const user = config.dashboardUsername;

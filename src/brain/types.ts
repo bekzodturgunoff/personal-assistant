@@ -43,4 +43,7 @@ export interface BrainOutput {
   relationship_stage: "stranger" | "acquaintance" | "warm_lead" | "regular";
   is_returning: boolean;
   lastUpdated: number;
+  detectedLanguage?: string;
+  persona_notes?: string;
+  lastConfidence?: number;
 }

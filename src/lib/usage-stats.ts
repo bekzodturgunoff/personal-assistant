@@ -31,7 +31,11 @@ export async function getUsageStats(): Promise<UsageStats> {
     if (!raw) return getDefaultUsageStats();
     const parsed = JSON.parse(raw) as UsageStats;
     if (parsed.month !== currentMonth()) return getDefaultUsageStats();
-    return parsed;
+    return {
+      month: parsed.month,
+      gemini: parsed.gemini || {},
+      groq: parsed.groq || {},
+    };
   } catch {
     return getDefaultUsageStats();
   }

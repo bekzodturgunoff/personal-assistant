@@ -21,8 +21,9 @@ export async function registerPublicCommands(bot: Bot): Promise<void> {
   if (commandsRegistered) return;
   try {
     const settings = await getBotSettings();
-    const cmds = settings.commands.length > 0
-      ? settings.commands.map((c) => ({command: c.command, description: c.description}))
+    const enabled = settings.commands.filter((c) => c.enabled);
+    const cmds = enabled.length > 0
+      ? enabled.map((c) => ({command: c.name, description: c.description}))
       : [{command: "mute" as const, description: "Stop the bot"}, {command: "unmute" as const, description: "Resume the bot"}, {command: "remind" as const, description: "Set a reminder"}];
     await Promise.all([
       bot.api.setMyCommands(cmds),

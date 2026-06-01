@@ -187,7 +187,15 @@ export async function getWeeklyAccumulator(): Promise<WeeklyAccumulator> {
       const parsed = JSON.parse(r);
       const fresh = getDefaultAccumulator();
       if (parsed.weekStart !== fresh.weekStart) return fresh;
-      return { ...parsed };
+      return {
+        ...fresh,
+        ...parsed,
+        conversationsSeen: Array.isArray(parsed.conversationsSeen) ? parsed.conversationsSeen : fresh.conversationsSeen,
+        languageBreakdown: { ...fresh.languageBreakdown, ...(parsed.languageBreakdown || {}) },
+        sentimentBreakdown: { ...fresh.sentimentBreakdown, ...(parsed.sentimentBreakdown || {}) },
+        intentBreakdown: { ...fresh.intentBreakdown, ...(parsed.intentBreakdown || {}) },
+        daily: Array.isArray(parsed.daily) ? parsed.daily : fresh.daily,
+      };
     }),
     getDefaultAccumulator(),
   );

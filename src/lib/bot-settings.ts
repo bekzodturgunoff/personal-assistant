@@ -27,7 +27,7 @@ export interface BotSettings {
     contact: string[];
     tone: string;
   };
-  commands: Array<{command: string; description: string}>;
+  commands: Array<BotCommandEntry>;
   objectionHandling: Record<string, string>;
   skipReplyPatterns: string[];
   replyTiming: {
@@ -90,9 +90,9 @@ export function getDefaultSettings(): BotSettings {
     speechPatterns: (p.speech_patterns as Record<string, string[]>) || {},
     businessMode: (p.business_mode as {contact: string[]; tone: string}) || {contact: [], tone: ""},
     commands: [
-      {command: "mute", description: "Stop the bot"},
-      {command: "unmute", description: "Resume the bot"},
-      {command: "remind", description: "Set a reminder"},
+      {id: generateCommandId(), name: "mute", description: "Stop the bot", instruction: "", generatedPrompt: "", enabled: true, createdAt: Date.now(), lastTestedAt: null, lastTestOutput: null},
+      {id: generateCommandId(), name: "unmute", description: "Resume the bot", instruction: "", generatedPrompt: "", enabled: true, createdAt: Date.now(), lastTestedAt: null, lastTestOutput: null},
+      {id: generateCommandId(), name: "remind", description: "Set a reminder", instruction: "", generatedPrompt: "", enabled: true, createdAt: Date.now(), lastTestedAt: null, lastTestOutput: null},
     ],
     objectionHandling: (p.objection_handling as Record<string, string>) || {},
     skipReplyPatterns: (p.skip_reply_patterns as string[]) || [],
@@ -143,6 +143,48 @@ export function getDefaultSettings(): BotSettings {
   };
 }
 
+export interface BotCommandEntry {
+  id: string;
+  name: string;
+  description: string;
+  instruction: string;
+  generatedPrompt: string;
+  enabled: boolean;
+  createdAt: number;
+  lastTestedAt: number | null;
+  lastTestOutput: string | null;
+}
+
+export function generateCommandId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+export function containsAntiPattern(reply: string, neverSay: string[]): string[] {
+  return neverSay.filter((p) => reply.toLowerCase().includes(p.toLowerCase()));
+}
+
+export async function getPersonaHistory(): Promise<Array<{savedAt: number; snapshot: BotSettings}>> {
+  const kv = getLongTermKv();
+  if (!kv) return [];
+  try {
+    const raw = await kv.get("persona_history");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function appendPersonaHistory(settings: BotSettings): Promise<void> {
+  const kv = getLongTermKv();
+  if (!kv) return;
+  try {
+    const history = await getPersonaHistory();
+    history.push({savedAt: Date.now(), snapshot: JSON.parse(JSON.stringify(settings))});
+    if (history.length > 10) history.splice(0, history.length - 10);
+    await kv.put("persona_history", JSON.stringify(history));
+  } catch {}
+}
+
 export async function getBotSettings(): Promise<BotSettings> {
   if (cache && Date.now() - cache.ts < CACHE_TTL) {
     return cache.settings;
@@ -154,6 +196,11 @@ export async function getBotSettings(): Promise<BotSettings> {
     const saved = raw ? (JSON.parse(raw) as Partial<BotSettings>) : {};
     const defaults = getDefaultSettings();
     const merged = deepMerge(defaults as unknown as Record<string, unknown>, saved as unknown as Record<string, unknown>) as unknown as BotSettings;
+    if (merged.commands.length > 0 && typeof merged.commands[0] === "object" && "command" in (merged.commands[0] as unknown as Record<string, unknown>) && !("id" in (merged.commands[0] as unknown as Record<string, unknown>))) {
+      merged.commands = (merged.commands as unknown as Array<{command: string; description: string}>).map((c) => ({
+        id: generateCommandId(), name: c.command, description: c.description, instruction: "", generatedPrompt: "", enabled: true, createdAt: Date.now(), lastTestedAt: null, lastTestOutput: null,
+      }));
+    }
     cache = {settings: merged, identityPrompt: "", ts: Date.now()};
     cache.identityPrompt = buildIdentityPromptSync(merged);
     return merged;
@@ -169,6 +216,7 @@ export async function saveBotSettings(settings: BotSettings): Promise<void> {
   if (!kv) return;
   await kv.put(SETTINGS_KEY, JSON.stringify(settings));
   cache = null;
+  appendPersonaHistory(settings).catch(() => {});
 }
 
 export async function getCachedSettings(): Promise<BotSettings> {
