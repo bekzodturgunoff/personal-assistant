@@ -2,6 +2,8 @@ import {GoogleGenAI} from "@google/genai/web";
 import {config} from "../config.js";
 import {getEnv} from "../runtime-env.js";
 import {getModelCooldownKv} from "./kv-store.js";
+import {getGeminiModels} from "./model-config.js";
+import {recordGeminiUsage} from "./usage-stats.js";
 
 let aiClient: GoogleGenAI | undefined;
 
@@ -31,14 +33,6 @@ export function limitResponse(
 }
 
 const COOLDOWN_MS = 24 * 60 * 60 * 1000;
-
-const MODEL_NAMES = [
-  getEnv("AI_MODEL") || "gemini-2.5-flash-lite",
-  getEnv("AI_FALLBACK_MODEL") || "gemini-2.5-flash",
-  getEnv("AI_FALLBACK_MODEL_2") || "gemini-3.1-flash-lite",
-  getEnv("AI_FALLBACK_MODEL_3") || "gemini-3.5-flash",
-  getEnv("AI_FALLBACK_MODEL_4") || "gemini-2.5-pro",
-];
 
 function kvKey(model: string): string {
   return `cooldown:${model}`;
@@ -119,6 +113,14 @@ async function callGemini(
     const text = res.text ?? "";
     const responsePreview = text.slice(0, 100).replace(/\n/g, "\\n");
     console.log(`[Gemini:${reqId}] <<< ${model} response: "${responsePreview}..." (${text.length} chars)`);
+
+    const usageMeta = (res as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata;
+    if (usageMeta) {
+      recordGeminiUsage(model, usageMeta.promptTokenCount || 0, usageMeta.candidatesTokenCount || 0);
+    } else {
+      recordGeminiUsage(model, prompt.length, text.length);
+    }
+
     if (text) return text;
     console.log(`[Gemini:${reqId}] <<< ${model} returned empty response`);
   } catch (e) {
@@ -140,14 +142,16 @@ export async function callGeminiWithFallback(prompt: string): Promise<string> {
   const reqId = ++requestCounter;
   const now = Date.now();
 
-  const statuses = await Promise.all(MODEL_NAMES.map(async (name) => {
+  const modelNames = await getGeminiModels();
+
+  const statuses = await Promise.all(modelNames.map(async (name) => {
     const cd = await getCooldown(name);
     return `${name}[${cd > now ? (cd - now) / 1000 + "s" : "ready"}]`;
   }));
   console.log(`[Gemini:${reqId}] starting — ${statuses.join(" | ")}`);
 
-  for (let i = 0; i < MODEL_NAMES.length; i++) {
-    const name = MODEL_NAMES[i];
+  for (let i = 0; i < modelNames.length; i++) {
+    const name = modelNames[i];
     const cd = await getCooldown(name);
 
     if (now < cd) {
@@ -173,12 +177,12 @@ export async function callGeminiWithFallback(prompt: string): Promise<string> {
     console.log(`[Gemini:${reqId}] model ${i} (${name}) returned null (non-quota), trying next`);
   }
 
-  const final = await Promise.all(MODEL_NAMES.map(async (name, i) => {
+  const final = await Promise.all(modelNames.map(async (name, i) => {
     const cd = await getCooldown(name);
     return `${i}:${name}[${cd > now ? "cooldown" : "ready"}]`;
   }));
   console.log(`[Gemini:${reqId}] ALL MODELS EXHAUSTED — ${final.join(", ")}`);
-  throw new Error(`Gemini all ${MODEL_NAMES.length} models failed (reqId=${reqId})`);
+  throw new Error(`Gemini all ${modelNames.length} models failed (reqId=${reqId})`);
 }
 
 export async function generateWithFallback(

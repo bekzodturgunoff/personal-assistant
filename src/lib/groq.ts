@@ -1,4 +1,6 @@
 import {config} from "../config.js";
+import {getGroqModels} from "./model-config.js";
+import {recordGroqUsage} from "./usage-stats.js";
 
 const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -6,9 +8,6 @@ export interface GroqMessage {
   role: "system" | "user" | "assistant";
   content: string;
 }
-
-const CHAT_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
-const JSON_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
 
 let requestCounter = 0;
 
@@ -55,8 +54,12 @@ async function callGroqModel(
       return null;
     }
 
-    const data = await res.json() as { choices: Array<{ message: { content: string } }> };
+    const data = await res.json() as { choices: Array<{ message: { content: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
     const text = data.choices?.[0]?.message?.content || "";
+
+    if (data.usage) {
+      recordGroqUsage(model, data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0);
+    }
 
     if (text) {
       console.log(`[Groq:${reqId}] <<< ${model} ok (${text.length} chars)`);
@@ -76,7 +79,8 @@ export async function callGroqWithFallback(
   jsonMode = false,
 ): Promise<string> {
   const reqId = ++requestCounter;
-  const models = jsonMode ? JSON_MODELS : CHAT_MODELS;
+  const groqConfig = await getGroqModels();
+  const models = jsonMode ? groqConfig.jsonModels : groqConfig.chatModels;
 
   console.log(`[Groq:${reqId}] starting — models: ${models.join(", ")}`);
 

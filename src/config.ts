@@ -49,4 +49,7 @@ export const config = {
     }
     return n;
   },
+  get dashboardPassword(): string {
+    return getEnv("DASHBOARD_PASSWORD") || "";
+  },
 };

@@ -8,6 +8,7 @@ import {setConversationsKv, setTasksKv, setLongTermKv, setModelCooldownKv} from 
 import {setChatStateKv} from "./src/lib/chat-state.js";
 import {handleMorningBriefing, handleWeeklyAnalytics, checkDueTasks} from "./src/handlers/tasks.js";
 import {processDuePendingReplies} from "./src/handlers/business.js";
+import {handleDashboardApi, renderDashboardPage} from "./src/dashboard.js";
 
 
 type RuntimeBindings = Record<string, unknown>;
@@ -167,6 +168,26 @@ export default {
         const response = await webhookCallback(bot, 'cloudflare-mod', { timeoutMilliseconds: 25000 })(request, env);
         ctx.waitUntil(processDuePendingReplies());
         return response;
+      }
+
+      // ── Dashboard ──
+      if (url.pathname.startsWith("/api/dashboard")) {
+        const pw = config.dashboardPassword;
+        if (!pw) {
+          return new Response("Dashboard disabled (DASHBOARD_PASSWORD not set)", { status: 404 });
+        }
+        if (url.pathname === "/api/dashboard" || url.pathname === "/api/dashboard/") {
+          return renderDashboardPage();
+        }
+        const auth = request.headers.get("Authorization") || "";
+        const token = auth.replace(/^Bearer\s+/i, "");
+        if (token !== pw) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+        const body = request.method === "PUT" || request.method === "POST" ? await request.text() : null;
+        const result = await handleDashboardApi(url.pathname, request.method, body);
+        if (result) return result;
+        return new Response("Not found", { status: 404 });
       }
 
       // Debug endpoints — only when DEBUG_ENABLED=true
