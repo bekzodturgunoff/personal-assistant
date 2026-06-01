@@ -1,5 +1,5 @@
 // ─── GitHub webhook handler: retired ───
-// Was used for OctoBot PR notifications with catchphrases.
+// Was used for legacy bot PR notifications with catchphrases.
 // All functionality is commented out. Legacy reference only.
 // import {Request, Response} from "express";
 // import type {Bot} from "grammy";

@@ -88,7 +88,7 @@ async function getTelegramDebugInfo(
   }
 }
 
-// GitHub webhook handler removed — OctoBot is now a personal assistant only
+// GitHub webhook handler removed — now a personal assistant only
 
 function renderHomePage(): Response {
   const html = `<!doctype html>

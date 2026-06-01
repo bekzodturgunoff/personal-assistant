@@ -1,7 +1,7 @@
 {
-  "name": "octopos-bot",
+  "name": "personal-assistan-bot",
   "version": "1.0.0",
-  "description": "Octopos Telegram Bot - AI team member & GitHub webhook notifier",
+  "description": "Personal Assistant Bot - AI Telegram assistant",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",

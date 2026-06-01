@@ -95,7 +95,14 @@ export function setupTelegramHandlers(bot: Bot) {
       await replySafe(ctx, response);
     } catch (error) {
       console.error(`[Router] DM AI error for ${senderName} (${chatId}):`, error);
-      await replySafe(ctx, "Hozir bandman, keyinroq javob beraman");
+      const fallbacks = [
+        "Hozir bandman, keyinroq javob beraman",
+        "Sal gaplashamiz keyin, hozir ish bilan bandman",
+        "Keyinroq yozaman, hozir biroz band",
+        "Hozir qo'lim tegmayapti, keyin albatta javob beraman",
+        "Hozir boshqa ish bilan bandman, keyin yozaman",
+      ];
+      await replySafe(ctx, fallbacks[Math.floor(Math.random() * fallbacks.length)]);
     }
   });
 }

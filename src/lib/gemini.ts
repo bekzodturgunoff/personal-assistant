@@ -82,9 +82,16 @@ function isQuotaOrRateLimitError(error: unknown): boolean {
     typeof candidate?.code === "string" ? candidate.code.toLowerCase() : "";
   const message = String(candidate?.message ?? "").toLowerCase();
 
+  if (status !== undefined) {
+    console.log(`[Gemini] error status=${status} code="${code}" message="${message.slice(0, 120)}"`);
+  }
+
+  if (status === 403) {
+    return false;
+  }
+
   return (
     status === 429 ||
-    status === 403 ||
     code.includes("resource_exhausted") ||
     code.includes("quota") ||
     message.includes("resource_exhausted") ||

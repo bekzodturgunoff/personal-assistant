@@ -113,7 +113,14 @@ export async function handleBusinessUpdate(
     );
   } catch (error) {
     console.error(`[Business] AI call FAILED for ${senderName} (${chatId}): "${text.slice(0, 80)}"`, error);
-    response = "Hozir bandman, keyinroq javob beraman";
+    const fallbacks = [
+      "Hozir bandman, keyinroq javob beraman",
+      "Sal gaplashamiz keyin, hozir ish bilan bandman",
+      "Keyinroq yozaman, hozir biroz band",
+      "Hozir qo'lim tegmayapti, keyin albatta javob beraman",
+      "Hozir boshqa ish bilan bandman, keyin yozaman",
+    ];
+    response = fallbacks[Math.floor(Math.random() * fallbacks.length)];
   }
 
   await addMessage(chatId, "assistant", response);

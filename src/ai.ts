@@ -1,5 +1,5 @@
 // Re-exports for the personal assistant
-// OctoBot barrel re-exports removed — only business assistant remains.
+// Legacy barrel re-exports removed — only business assistant remains.
 
 export {
   limitResponse,
