@@ -1527,11 +1527,17 @@ async function fetchData() {
     document.getElementById("dashboard").style.display = "block";
     document.getElementById("login-error").style.display = "none";
     render();
+    loadConversations();
     return true;
   } catch {
     return false;
   }
 }
+
+// Auto-refresh recent activity every 30 seconds
+setInterval(() => {
+  loadConversations();
+}, 30000);
 
 // Auto-login if token exists
 if (token) fetchData().then(ok => {
