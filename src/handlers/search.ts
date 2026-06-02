@@ -1,4 +1,4 @@
-import {config} from "../config.js";
+import {config} from "../config/env.js";
 
 export interface SearchResult {
   title: string;

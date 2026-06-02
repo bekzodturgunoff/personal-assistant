@@ -1,7 +1,7 @@
 import {Bot} from "grammy/web";
-import {config} from "./config.js";
-import {setupTelegramHandlers} from "./handlers/telegram.js";
-import {getBotSettings} from "./lib/bot-settings.js";
+import {config} from "./config/env.js";
+import {setupTelegramHandlers} from "./handlers/commands/index.js";
+import {getBotSettings} from "./lib/bot-settings/index.js";
 
 let commandsRegistered = false;
 

@@ -1,5 +1,5 @@
 import type {GeminiResponse} from "./gemini.js";
-import {getCachedSettings} from "./bot-settings.js";
+import {getCachedSettings} from "./bot-settings/index.js";
 
 export interface ConfidenceCheck {
   score: number;

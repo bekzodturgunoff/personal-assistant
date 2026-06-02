@@ -1,33 +1,28 @@
-import {getConversationsKv} from "./kv-store.js";
-import {getEnv} from "../runtime-env.js";
+import {getConversationsKv} from "../memory/index.js";
+import {getEnv} from "../config/env.js";
+import {KV_KEYS, MODEL_NAMES, ENV_NAMES} from "../config/constants.js";
 
-const GEMINI_CONFIG_KEY = "config:models:gemini";
-const GROQ_CONFIG_KEY = "config:models:groq";
+const GEMINI_CONFIG_KEY = KV_KEYS.GEMINI_CONFIG;
+const GROQ_CONFIG_KEY = KV_KEYS.GROQ_CONFIG;
 
 function envDefaultGeminiModels(): string[] {
-  const m0 = getEnv("AI_MODEL");
-  const m1 = getEnv("AI_FALLBACK_MODEL");
-  const m2 = getEnv("AI_FALLBACK_MODEL_2");
-  const m3 = getEnv("AI_FALLBACK_MODEL_3");
-  const m4 = getEnv("AI_FALLBACK_MODEL_4");
-  if (m0) return [m0, m1 || "gemini-2.5-flash", m2 || "gemini-3.1-flash-lite", m3 || "gemini-3.5-flash", m4 || "gemini-2.5-pro"].filter(Boolean);
+  const m0 = getEnv(ENV_NAMES.AI_MODEL);
+  const m1 = getEnv(ENV_NAMES.AI_FALLBACK_MODEL);
+  const m2 = getEnv(ENV_NAMES.AI_FALLBACK_MODEL_2);
+  const m3 = getEnv(ENV_NAMES.AI_FALLBACK_MODEL_3);
+  const m4 = getEnv(ENV_NAMES.AI_FALLBACK_MODEL_4);
+  if (m0) return [m0, m1 || MODEL_NAMES.GEMINI_DEFAULT[1], m2 || MODEL_NAMES.GEMINI_DEFAULT[2], m3 || MODEL_NAMES.GEMINI_DEFAULT[3], m4 || MODEL_NAMES.GEMINI_DEFAULT[4]].filter(Boolean);
   return [];
 }
 
 const DEFAULT_GEMINI_MODELS = (() => {
   const env = envDefaultGeminiModels();
   if (env.length > 0) return env;
-  return [
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-3.5-flash",
-    "gemini-2.5-pro",
-  ];
+  return [...MODEL_NAMES.GEMINI_DEFAULT];
 })();
 
-const DEFAULT_GROQ_CHAT_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
-const DEFAULT_GROQ_JSON_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+const DEFAULT_GROQ_CHAT_MODELS = [...MODEL_NAMES.GROQ_CHAT_DEFAULT];
+const DEFAULT_GROQ_JSON_MODELS = [...MODEL_NAMES.GROQ_JSON_DEFAULT];
 
 export interface GeminiModelConfig {
   models: string[];

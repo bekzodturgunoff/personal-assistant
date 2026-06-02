@@ -1,4 +1,4 @@
-import {getLongTermKv} from "./kv-store.js";
+import {getLongTermKv} from "../memory/index.js";
 
 export interface ModelUsage {
   inputTokens: number;

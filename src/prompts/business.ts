@@ -8,8 +8,8 @@
 import {callGeminiStructured, limitResponse} from "../lib/gemini.js";
 import type {GeminiResponse} from "../lib/gemini.js";
 import {formatTashkentTime} from "../lib/reply-timing.js";
-import {getBotSettings, buildIdentityPrompt} from "../lib/bot-settings.js";
-import type {BotSettings} from "../lib/bot-settings.js";
+import {getBotSettings, buildIdentityPrompt} from "../lib/bot-settings/index.js";
+import type {BotSettings} from "../lib/bot-settings/index.js";
 
 let cachedSettings: BotSettings | null = null;
 let cachedIdentityPrompt: string | null = null;

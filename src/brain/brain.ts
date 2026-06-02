@@ -2,8 +2,8 @@ import type {BrainAnalysis, BrainProvider, BrainOutput} from "./types.js";
 import {BRAIN_OUTPUT_DEFAULTS} from "./types.js";
 import {createGroqBrainProvider} from "./providers/groq-brain.js";
 import {getFullHistory} from "../conversation-memory.js";
-import {getConversationsKv, updateUserMeta, getWeeklyAccumulator, saveWeeklyAccumulator, touchDailyEntry} from "../lib/kv-store.js";
-import {getCachedSettings} from "../lib/bot-settings.js";
+import {getConversationsKv, updateUserMeta, getWeeklyAccumulator, saveWeeklyAccumulator, touchDailyEntry} from "../memory/index.js";
+import {getCachedSettings} from "../lib/bot-settings/index.js";
 
 let provider: BrainProvider | null = null;
 const brainAnalysisInProgress = new Set<number>();

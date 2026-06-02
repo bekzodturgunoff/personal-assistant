@@ -2,9 +2,8 @@ import dotenv from "dotenv";
 import express from "express";
 import {webhookCallback} from "grammy/web";
 import {createBot, registerPublicCommands} from "./bot.js";
-import {config} from "./config.js";
-import {getEnv} from "./runtime-env.js";
-import {handleDashboardApi, renderDashboardPage} from "./dashboard.js";
+import {config, getEnv} from "./config/env.js";
+import {handleDashboardApi, renderDashboardPage} from "./dashboard/index.js";
 
 dotenv.config();
 
@@ -20,8 +19,8 @@ app.use("/api/dashboard", express.text(), async (req, res, next) => {
     return;
   }
   if (req.path === "/" || req.path === "") {
-    const html = await renderDashboardPage();
-    res.type("html").send(html);
+    const page = await renderDashboardPage();
+    res.type("html").send(await page.text());
     return;
   }
   const auth = req.headers.authorization || "";

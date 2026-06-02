@@ -1,4 +1,4 @@
-import {config} from "../config.js";
+import {config} from "../config/env.js";
 import {getGroqModels} from "./model-config.js";
 import {recordGroqUsage} from "./usage-stats.js";
 

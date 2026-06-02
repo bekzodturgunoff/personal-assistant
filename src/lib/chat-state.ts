@@ -1,5 +1,5 @@
-import type {KvStore} from "./kv-store.js";
-import {getCachedSettings} from "./bot-settings.js";
+import type {KvStore} from "../memory/index.js";
+import {getCachedSettings} from "./bot-settings/index.js";
 
 let kvBinding: KvStore | null = null;
 

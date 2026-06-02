@@ -1,4 +1,4 @@
-import {getLongTermKv} from "./lib/kv-store.js";
+import {getLongTermKv} from "./memory/index.js";
 
 interface UserMemory {
   userId: number;
