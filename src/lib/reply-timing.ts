@@ -60,31 +60,61 @@ export async function calculateReplyAt(state: ChatTimingState, now: number): Pro
   return now + normalReplyDelayMs + randomExtraMs;
 }
 
+const PENDING_INDEX_KEY = "_pending_idx";
+
 function pendingKey(chatId: number): string {
   return `pending:${chatId}`;
 }
 
+interface IndexEntry {
+  chatId: number;
+  replyAfter: number;
+}
+
+async function readIndex(kv: KvStore): Promise<IndexEntry[]> {
+  try {
+    const raw = await kv.get(PENDING_INDEX_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeIndex(kv: KvStore, index: IndexEntry[]): Promise<void> {
+  await kv.put(PENDING_INDEX_KEY, JSON.stringify(index));
+}
+
 export async function addPendingReply(kv: KvStore, reply: PendingReply): Promise<void> {
   await kv.put(pendingKey(reply.chatId), JSON.stringify(reply));
+  const index = await readIndex(kv);
+  if (!index.some((e) => e.chatId === reply.chatId)) {
+    index.push({chatId: reply.chatId, replyAfter: reply.replyAfter});
+    await writeIndex(kv, index);
+  }
 }
 
 export async function getDuePendingReplies(kv: KvStore, now: number): Promise<PendingReply[]> {
-  if (!kv.list) return [];
-
-  const result = await kv.list({prefix: "pending:"});
+  const index = await readIndex(kv);
   const due: PendingReply[] = [];
+  const stale: number[] = [];
 
-  for (const key of result.keys) {
+  for (const entry of index) {
+    if (entry.replyAfter > now) continue;
     try {
-      const raw = await kv.get(key.name);
-      if (!raw) continue;
+      const raw = await kv.get(pendingKey(entry.chatId));
+      if (!raw) { stale.push(entry.chatId); continue; }
       const reply = JSON.parse(raw) as PendingReply;
       if (reply.replyAfter <= now || reply.isUrgent) {
         due.push(reply);
       }
     } catch {
-      continue;
+      stale.push(entry.chatId);
     }
+  }
+
+  if (stale.length > 0) {
+    const cleaned = index.filter((e) => !stale.includes(e.chatId));
+    await writeIndex(kv, cleaned);
   }
 
   return due;
@@ -92,6 +122,11 @@ export async function getDuePendingReplies(kv: KvStore, now: number): Promise<Pe
 
 export async function removePendingReply(kv: KvStore, chatId: number): Promise<void> {
   await kv.delete?.(pendingKey(chatId));
+  const index = await readIndex(kv);
+  const filtered = index.filter((e) => e.chatId !== chatId);
+  if (filtered.length < index.length) {
+    await writeIndex(kv, filtered);
+  }
 }
 
 export async function getPendingReply(kv: KvStore, chatId: number): Promise<PendingReply | null> {

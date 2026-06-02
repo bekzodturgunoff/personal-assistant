@@ -98,6 +98,18 @@ export async function handleRequest(request: Request, _env: Env, ctx: Ctx): Prom
       if (url.pathname === "/debug/telegram") {
         return getTelegramDebugInfo(bot, url.origin);
       }
+
+      if (url.pathname === "/debug/pending") {
+        try {
+          const conversationsKv = await import("../memory/store.js").then((m) => m.getConversationsKv());
+          if (!conversationsKv) return Response.json({error: "KV not available"}, {status: 500});
+          const indexRaw = await conversationsKv.get("_pending_idx");
+          const index = indexRaw ? JSON.parse(indexRaw) : [];
+          return Response.json({pendingCount: index.length, pendingIndex: index, pendingRaw: indexRaw});
+        } catch (e) {
+          return Response.json({error: String(e)}, {status: 500});
+        }
+      }
     }
 
     if (url.pathname === "/favicon.ico") {

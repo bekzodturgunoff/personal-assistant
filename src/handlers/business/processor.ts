@@ -181,13 +181,20 @@ export async function processDuePendingReplies(): Promise<void> {
   isProcessingReplies = true;
   try {
     const kv = getConversationsKv();
-    if (!kv) { isProcessingReplies = false; return; }
+    if (!kv) {
+      console.error("[Business] processDuePendingReplies: conversationsKv is null");
+      isProcessingReplies = false;
+      return;
+    }
     const due = await getDuePendingReplies(kv, Date.now());
     if (due.length === 0) { isProcessingReplies = false; return; }
+    console.log(`[Business] Processing ${due.length} due pending replies`);
     await Promise.all(due.map((p) => processOnePending(p, kv).catch(async (e) => {
       console.error(`[Business] Failed to process pending reply for chat ${p.chatId}:`, e);
       await removePendingReply(kv, p.chatId).catch(() => {});
     })));
+  } catch (e) {
+    console.error("[Business] processDuePendingReplies error:", e);
   } finally {
     isProcessingReplies = false;
   }
