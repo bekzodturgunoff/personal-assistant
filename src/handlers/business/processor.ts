@@ -184,9 +184,10 @@ export async function processDuePendingReplies(): Promise<void> {
     if (!kv) { isProcessingReplies = false; return; }
     const due = await getDuePendingReplies(kv, Date.now());
     if (due.length === 0) { isProcessingReplies = false; return; }
-    await Promise.all(due.map((p) => processOnePending(p, kv).catch((e) =>
-      console.error(`[Business] Failed to process pending reply for chat ${p.chatId}:`, e),
-    )));
+    await Promise.all(due.map((p) => processOnePending(p, kv).catch(async (e) => {
+      console.error(`[Business] Failed to process pending reply for chat ${p.chatId}:`, e);
+      await removePendingReply(kv, p.chatId).catch(() => {});
+    })));
   } finally {
     isProcessingReplies = false;
   }

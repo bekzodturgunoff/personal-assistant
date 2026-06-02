@@ -33,6 +33,7 @@ export async function ensureTelegramWebhook(bot: ReturnType<typeof createBot>, o
     await bot.api.setWebhook(webhookUrl, {
       drop_pending_updates: true,
       secret_token: secretToken,
+      allowed_updates: [] as const,
     });
     console.log(`Telegram webhook set to ${webhookUrl}${secretToken ? " with secret token" : ""}`);
   } catch (error) {
