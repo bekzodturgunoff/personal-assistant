@@ -51,11 +51,11 @@ export function getDefaultSettings(): BotSettings {
     skipReplyPatterns: (p.skip_reply_patterns as string[]) || [],
     replyTiming: {
       conversationGapMinutes: 30,
-      firstReplyDelaySeconds: 240,
-      slowReplyDelaySeconds: 240,
-      normalReplyDelaySeconds: 90,
-      slowThresholdSeconds: 180,
-      randomExtraMaxSeconds: 120,
+      firstReplyDelaySeconds: 3,
+      slowReplyDelaySeconds: 5,
+      normalReplyDelaySeconds: 2,
+      slowThresholdSeconds: 30,
+      randomExtraMaxSeconds: 2,
     },
     confidence: {
       enabled: true,

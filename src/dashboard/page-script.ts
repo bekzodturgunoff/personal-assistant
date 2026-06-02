@@ -932,11 +932,11 @@ function renderSettings(s) {
   // Reply Timing
   const rt = s.replyTiming || {};
   document.getElementById("set-rt-conversation-gap").value = rt.conversationGapMinutes ?? 30;
-  document.getElementById("set-rt-first-delay").value = rt.firstReplyDelaySeconds ?? 240;
-  document.getElementById("set-rt-slow-delay").value = rt.slowReplyDelaySeconds ?? 240;
-  document.getElementById("set-rt-normal-delay").value = rt.normalReplyDelaySeconds ?? 90;
-  document.getElementById("set-rt-slow-threshold").value = rt.slowThresholdSeconds ?? 180;
-  document.getElementById("set-rt-random-extra").value = rt.randomExtraMaxSeconds ?? 120;
+  document.getElementById("set-rt-first-delay").value = rt.firstReplyDelaySeconds ?? 3;
+  document.getElementById("set-rt-slow-delay").value = rt.slowReplyDelaySeconds ?? 5;
+  document.getElementById("set-rt-normal-delay").value = rt.normalReplyDelaySeconds ?? 2;
+  document.getElementById("set-rt-slow-threshold").value = rt.slowThresholdSeconds ?? 30;
+  document.getElementById("set-rt-random-extra").value = rt.randomExtraMaxSeconds ?? 2;
 
   // Confidence
   const conf = s.confidence || {};
@@ -967,6 +967,15 @@ function renderSettings(s) {
   document.getElementById("set-returning-days").value = s.returningContactDays ?? 7;
 }
 
+function intVal(id, def) {
+  const v = parseInt(document.getElementById(id).value, 10);
+  return Number.isNaN(v) ? def : v;
+}
+function floatVal(id, def) {
+  const v = parseFloat(document.getElementById(id).value);
+  return Number.isNaN(v) ? def : v;
+}
+
 function collectSettings() {
   return {
     name: document.getElementById("set-name").value.trim(),
@@ -987,29 +996,29 @@ function collectSettings() {
       tone: document.getElementById("set-business-tone").value.trim(),
     },
     replyTiming: {
-      conversationGapMinutes: parseInt(document.getElementById("set-rt-conversation-gap").value) || 30,
-      firstReplyDelaySeconds: parseInt(document.getElementById("set-rt-first-delay").value) || 240,
-      slowReplyDelaySeconds: parseInt(document.getElementById("set-rt-slow-delay").value) || 240,
-      normalReplyDelaySeconds: parseInt(document.getElementById("set-rt-normal-delay").value) || 90,
-      slowThresholdSeconds: parseInt(document.getElementById("set-rt-slow-threshold").value) || 180,
-      randomExtraMaxSeconds: parseInt(document.getElementById("set-rt-random-extra").value) || 120,
+      conversationGapMinutes: intVal("set-rt-conversation-gap", 30),
+      firstReplyDelaySeconds: intVal("set-rt-first-delay", 3),
+      slowReplyDelaySeconds: intVal("set-rt-slow-delay", 5),
+      normalReplyDelaySeconds: intVal("set-rt-normal-delay", 2),
+      slowThresholdSeconds: intVal("set-rt-slow-threshold", 30),
+      randomExtraMaxSeconds: intVal("set-rt-random-extra", 2),
     },
     confidence: {
       enabled: document.getElementById("set-conf-enabled").value === "true",
-      fallbackThreshold: parseFloat(document.getElementById("set-conf-threshold").value) || 0.65,
+      fallbackThreshold: floatVal("set-conf-threshold", 0.65),
       fallbackPhrases: document.getElementById("set-conf-phrases").value.split("\\n").map((s) => s.trim()).filter(Boolean),
       clarifiers: state.settings?.confidence?.clarifiers || {},
     },
-    lowConfAlertThreshold: parseInt(document.getElementById("set-lowconf-threshold").value) || 3,
-    typingMsPerChar: parseInt(document.getElementById("set-typing-mschar").value) || 45,
-    typingMaxMs: parseInt(document.getElementById("set-typing-maxms").value) || 4000,
-    maxResponseChars: parseInt(document.getElementById("set-max-chars").value) || 500,
-    maxResponseSentences: parseInt(document.getElementById("set-max-sentences").value) || 3,
+    lowConfAlertThreshold: intVal("set-lowconf-threshold", 3),
+    typingMsPerChar: intVal("set-typing-mschar", 45),
+    typingMaxMs: intVal("set-typing-maxms", 4000),
+    maxResponseChars: intVal("set-max-chars", 500),
+    maxResponseSentences: intVal("set-max-sentences", 3),
     brainAnalysisEnabled: document.getElementById("set-brain-enabled").value === "true",
-    brainAnalysisInterval: parseInt(document.getElementById("set-brain-interval").value) || 4,
+    brainAnalysisInterval: intVal("set-brain-interval", 4),
     aiFallbackPhrases: document.getElementById("set-ai-fallbacks").value.split("\\n").map((s) => s.trim()).filter(Boolean),
-    groupReplyCooldownMs: parseInt(document.getElementById("set-group-cooldown").value) || 12000,
-    returningContactDays: parseInt(document.getElementById("set-returning-days").value) || 7,
+    groupReplyCooldownMs: intVal("set-group-cooldown", 12000),
+    returningContactDays: intVal("set-returning-days", 7),
   };
 }
 
