@@ -42,6 +42,21 @@ compatibility_date = "2026-05-23"
 [triggers]
 crons = ["0 3 * * *"]
 
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
+
 [[kv_namespaces]]
 binding = "CONVERSATIONS"
 id = "b43cce2403b24eb990ac7e5ad791d5e2"
