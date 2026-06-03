@@ -2,6 +2,10 @@ import type {Bot, Context} from "grammy/web";
 import {muteChat, unmuteChat} from "../../lib/chat-state.js";
 
 export function setupPublicCommands(bot: Bot): void {
+  bot.command("start", async (ctx) => {
+    await ctx.reply("Bot is online. Send me a message and I will reply.", {link_preview_options: {is_disabled: true}});
+  });
+
   bot.command("ping", async (ctx) => {
     const ts = new Date().toISOString();
     await ctx.reply(`ok — business handler active | ${ts}`, {link_preview_options: {is_disabled: true}});
