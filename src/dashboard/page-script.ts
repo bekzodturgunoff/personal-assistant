@@ -117,7 +117,7 @@ function renderBotStatus() {
     label.style.color = data.muted ? "#f87171" : "#4ade80";
     if (slider) slider.style.background = data.muted ? "#475569" : "#3b82f6";
     if (ts) ts.textContent = data.muted ? "Paused" : "Active";
-  })).catch(() => {});
+  }).catch(() => {});
 }
 
 async function toggleBotStatus() {
