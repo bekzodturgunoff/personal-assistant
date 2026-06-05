@@ -46,6 +46,16 @@ export async function handleRequest(request: Request, _env: Env, ctx: Ctx): Prom
       if (secretToken && request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secretToken) {
         return new Response("Unauthorized", {status: 401});
       }
+      try {
+        const clone = request.clone();
+        const payload = await clone.json() as Record<string, unknown>;
+        const keys = Object.keys(payload || {});
+        const updateId = typeof payload.update_id === "number" ? payload.update_id : "?";
+        const topKey = keys.find((k) => k !== "update_id") || "unknown";
+        console.log(`[Webhook] update_id=${updateId} type=${topKey} keys=${keys.join(",")}`);
+      } catch (e) {
+        console.warn("[Webhook] Failed to parse update JSON:", e);
+      }
       const response = await webhookCallback(bot, "cloudflare-mod", {timeoutMilliseconds: 25000})(request);
       ctx.waitUntil(processDuePendingReplies());
       return response;
