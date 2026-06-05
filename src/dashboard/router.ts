@@ -10,6 +10,7 @@ import {
 import {
   handleCommandGenerate, handleCommandTest, handleCommandCreate,
   handleCommandUpdate, handleCommandDelete, handleCommandRegister,
+  getDashboardCommands,
 } from "./commands.js";
 import {getBrainOverview, getBrainLowConfidence, getBrainForChat, handleBrainPatch, handleBrainDelete} from "./brain.js";
 import {handlePersonaTest, handlePersonaRevert} from "./persona.js";
@@ -165,7 +166,7 @@ export async function handleNonDashboardApi(pathname: string, method: string, bo
       return handleCommandTest(body);
     }
     if (pathname === "/api/commands" && method === "GET") {
-      return json((await getBotSettings()).commands);
+      return json(await getDashboardCommands());
     }
     if (pathname === "/api/commands" && method === "POST") {
       if (!body) return json({error: "no body"}, 400);

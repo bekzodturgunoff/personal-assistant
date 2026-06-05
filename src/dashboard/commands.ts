@@ -5,6 +5,43 @@ import {getConversationsKv} from "../memory/index.js";
 import {config} from "../config/env.js";
 import {json} from "./helpers.js";
 
+type DashboardCommand = BotCommandEntry & {system?: boolean};
+
+const SYSTEM_COMMANDS: DashboardCommand[] = [
+  {
+    id: "system_start",
+    name: "start",
+    description: "Basic bot status check",
+    instruction: "",
+    generatedPrompt: "",
+    enabled: true,
+    createdAt: 0,
+    lastTestedAt: null,
+    lastTestOutput: null,
+    system: true,
+  },
+  {
+    id: "system_ping",
+    name: "ping",
+    description: "Ping/health check",
+    instruction: "",
+    generatedPrompt: "",
+    enabled: true,
+    createdAt: 0,
+    lastTestedAt: null,
+    lastTestOutput: null,
+    system: true,
+  },
+];
+
+export async function getDashboardCommands(): Promise<DashboardCommand[]> {
+  const settings = await getBotSettings();
+  const userCommands = settings.commands || [];
+  const userNames = new Set(userCommands.map((c) => c.name));
+  const system = SYSTEM_COMMANDS.filter((c) => !userNames.has(c.name));
+  return [...system, ...userCommands];
+}
+
 export async function handleCommandGenerate(body: string): Promise<Response> {
   const {name, description, instruction} = JSON.parse(body) as {name?: string; description?: string; instruction?: string};
   if (!name || !description || !instruction) return json({error: "name, description, instruction required"}, 400);

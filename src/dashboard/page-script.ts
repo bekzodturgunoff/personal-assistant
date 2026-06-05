@@ -45,6 +45,7 @@ async function authFetch(url, opts = {}) {
   }
   if (res.status === 500) {
     console.error("Server error on", url);
+    toast("Server error: " + url, true);
   }
   return res;
 }
@@ -106,11 +107,16 @@ function renderBotStatus() {
   const slider = document.getElementById("bot-status-slider");
   const ts = document.getElementById("bot-status-timestamp");
   if (!toggle) return;
-  authFetch("/api/conversations/global/mute").then(r => r.json().then(data => {
+  authFetch("/api/conversations/global/mute").then(r => {
+    if (!r.ok) return null;
+    return r.json();
+  }).then(data => {
+    if (!data) return;
     toggle.checked = !data.muted;
     label.textContent = data.muted ? "Paused" : "Active";
     label.style.color = data.muted ? "#f87171" : "#4ade80";
     if (slider) slider.style.background = data.muted ? "#475569" : "#3b82f6";
+    if (ts) ts.textContent = data.muted ? "Paused" : "Active";
   })).catch(() => {});
 }
 
@@ -239,6 +245,7 @@ async function selectConversation(chatId) {
 
 async function toggleMute(chatId) {
   const current = state.conversations.find(c => c.chatId === chatId);
+  if (!current) return toast("Conversation not found", true);
   const muted = !(current && current.muted);
   const res = await authFetch("/api/conversations/" + chatId + "/mute", {
     method: "POST",
@@ -251,6 +258,7 @@ async function toggleMute(chatId) {
 }
 
 function showInjectModal(chatId) {
+  document.getElementById("inject-modal")?.remove();
   const el = document.getElementById("conv-detail");
   const modal = document.createElement("div");
   modal.id = "inject-modal";
@@ -367,6 +375,7 @@ async function loadBrainTab() {
   const res = await authFetch("/api/brain/overview");
   if (!res.ok) return;
   const data = await res.json();
+  if (!data || typeof data !== "object") return;
   renderBrainStats(data);
   renderBrainBreakdown(data.intentBreakdown || {}, "brain-intent-breakdown", ["#60a5fa","#facc15","#f87171","#4ade80","#a78bfa","#64748b"]);
   renderBrainBreakdown(data.sentimentBreakdown || {}, "brain-sentiment-breakdown", ["#4ade80","#94a3b8","#f87171"]);
@@ -487,13 +496,20 @@ function renderCommandList() {
     return;
   }
   el.innerHTML = commandList.map(c =>
+    (c.system
+      ? '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #1e293b;opacity:0.8;">' +
+          '<code style="background:#0f172a;padding:2px 8px;border-radius:4px;color:#93c5fd;">/' + esc(c.name) + '</code>' +
+          '<span style="flex:1;color:#94a3b8;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(c.description) + '</span>' +
+          '<span style="font-size:0.7rem;color:#94a3b8;border:1px solid #334155;padding:2px 6px;border-radius:999px;">system</span>' +
+        '</div>'
+      :
     '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #1e293b;">' +
       '<code style="background:#0f172a;padding:2px 8px;border-radius:4px;color:#93c5fd;">/' + esc(c.name) + '</code>' +
       '<span style="flex:1;color:#94a3b8;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(c.description) + '</span>' +
       '<label style="position:relative;display:inline-block;width:36px;height:20px;"><input type="checkbox" ' + (c.enabled ? 'checked' : '') + ' onchange="toggleCommand(' + "'" + esc(c.id) + "'" + ',this.checked)" style="opacity:0;width:0;height:0;"><span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:' + (c.enabled ? '#3b82f6' : '#475569') + ';border-radius:20px;transition:0.3s;"></span></label>' +
       '<button class="btn sm" onclick="editCommand(' + "'" + esc(c.id) + "'" + ')">Edit</button>' +
       '<span style="cursor:pointer;color:#ef4444;font-size:0.8rem;" onclick="deleteCommand(' + "'" + esc(c.id) + "'" + ')">✕</span>' +
-    '</div>'
+    '</div>')
   ).join("");
 }
 
@@ -830,7 +846,7 @@ function addGeminiModel() {
   if (val && !geminiModels.includes(val)) { geminiModels.push(val); input.value = ""; updateGeminiUI(); }
 }
 
-function removeGeminiModel(i) { geminiModels.splice(i, 1); updateGeminiUI(); }
+function removeGeminiModel(i) { if (i >= 0 && i < geminiModels.length) { geminiModels.splice(i, 1); updateGeminiUI(); } }
 
 async function saveGeminiModels() {
   if (geminiModels.length === 0) return toast("Need at least one model", true);
@@ -875,13 +891,13 @@ function addGroqChatModel() {
   const val = input.value.trim();
   if (val && !groqChatModels.includes(val)) { groqChatModels.push(val); input.value = ""; updateGroqUI(); }
 }
-function removeGroqChatModel(i) { groqChatModels.splice(i, 1); updateGroqUI(); }
+function removeGroqChatModel(i) { if (i >= 0 && i < groqChatModels.length) { groqChatModels.splice(i, 1); updateGroqUI(); } }
 function addGroqJsonModel() {
   const input = document.getElementById("groq-json-input");
   const val = input.value.trim();
   if (val && !groqJsonModels.includes(val)) { groqJsonModels.push(val); input.value = ""; updateGroqUI(); }
 }
-function removeGroqJsonModel(i) { groqJsonModels.splice(i, 1); updateGroqUI(); }
+function removeGroqJsonModel(i) { if (i >= 0 && i < groqJsonModels.length) { groqJsonModels.splice(i, 1); updateGroqUI(); } }
 
 async function saveGroqModels() {
   if (groqChatModels.length === 0 || groqJsonModels.length === 0) return toast("Need at least one model per type", true);
@@ -921,12 +937,12 @@ function renderSettings(s) {
   document.getElementById("set-style").value = s.background?.style || "";
   document.getElementById("set-languages").value = (s.background?.languages || []).join(", ");
 
-  document.getElementById("set-absolute-rules").value = (s.absoluteRules || []).join("\\n");
-  document.getElementById("set-never-say").value = (s.neverSay || []).join("\\n");
-  document.getElementById("set-behavior-rules").value = (s.behaviorRules || []).join("\\n");
-  document.getElementById("set-fallback-rules").value = (s.fallbackRules || []).join("\\n");
+  document.getElementById("set-absolute-rules").value = (s.absoluteRules || []).join("\n");
+  document.getElementById("set-never-say").value = (s.neverSay || []).join("\n");
+  document.getElementById("set-behavior-rules").value = (s.behaviorRules || []).join("\n");
+  document.getElementById("set-fallback-rules").value = (s.fallbackRules || []).join("\n");
 
-  document.getElementById("set-contact").value = (s.businessMode?.contact || []).join("\\n");
+  document.getElementById("set-contact").value = (s.businessMode?.contact || []).join("\n");
   document.getElementById("set-business-tone").value = s.businessMode?.tone || "";
 
   // Reply Timing
@@ -942,7 +958,7 @@ function renderSettings(s) {
   const conf = s.confidence || {};
   document.getElementById("set-conf-enabled").value = conf.enabled !== false ? "true" : "false";
   document.getElementById("set-conf-threshold").value = conf.fallbackThreshold ?? 0.65;
-  document.getElementById("set-conf-phrases").value = (conf.fallbackPhrases || []).join("\\n");
+  document.getElementById("set-conf-phrases").value = (conf.fallbackPhrases || []).join("\n");
 
   // Low conf alert
   document.getElementById("set-lowconf-threshold").value = s.lowConfAlertThreshold ?? 3;
@@ -960,7 +976,7 @@ function renderSettings(s) {
   document.getElementById("set-brain-interval").value = s.brainAnalysisInterval ?? 4;
 
   // AI fallbacks
-  document.getElementById("set-ai-fallbacks").value = (s.aiFallbackPhrases || []).join("\\n");
+  document.getElementById("set-ai-fallbacks").value = (s.aiFallbackPhrases || []).join("\n");
 
   // Other
   document.getElementById("set-group-cooldown").value = s.groupReplyCooldownMs ?? 12000;
@@ -987,12 +1003,12 @@ function collectSettings() {
       style: document.getElementById("set-style").value.trim(),
       languages: document.getElementById("set-languages").value.split(",").map((s) => s.trim()).filter(Boolean),
     },
-    absoluteRules: document.getElementById("set-absolute-rules").value.split("\\n").map((s) => s.trim()).filter(Boolean),
-    neverSay: document.getElementById("set-never-say").value.split("\\n").map((s) => s.trim()).filter(Boolean),
-    behaviorRules: document.getElementById("set-behavior-rules").value.split("\\n").map((s) => s.trim()).filter(Boolean),
-    fallbackRules: document.getElementById("set-fallback-rules").value.split("\\n").map((s) => s.trim()).filter(Boolean),
+    absoluteRules: document.getElementById("set-absolute-rules").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    neverSay: document.getElementById("set-never-say").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    behaviorRules: document.getElementById("set-behavior-rules").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    fallbackRules: document.getElementById("set-fallback-rules").value.split("\n").map((s) => s.trim()).filter(Boolean),
     businessMode: {
-      contact: document.getElementById("set-contact").value.split("\\n").map((s) => s.trim()).filter(Boolean),
+      contact: document.getElementById("set-contact").value.split("\n").map((s) => s.trim()).filter(Boolean),
       tone: document.getElementById("set-business-tone").value.trim(),
     },
     replyTiming: {
@@ -1006,7 +1022,7 @@ function collectSettings() {
     confidence: {
       enabled: document.getElementById("set-conf-enabled").value === "true",
       fallbackThreshold: floatVal("set-conf-threshold", 0.65),
-      fallbackPhrases: document.getElementById("set-conf-phrases").value.split("\\n").map((s) => s.trim()).filter(Boolean),
+      fallbackPhrases: document.getElementById("set-conf-phrases").value.split("\n").map((s) => s.trim()).filter(Boolean),
       clarifiers: state.settings?.confidence?.clarifiers || {},
     },
     lowConfAlertThreshold: intVal("set-lowconf-threshold", 3),
@@ -1016,7 +1032,7 @@ function collectSettings() {
     maxResponseSentences: intVal("set-max-sentences", 3),
     brainAnalysisEnabled: document.getElementById("set-brain-enabled").value === "true",
     brainAnalysisInterval: intVal("set-brain-interval", 4),
-    aiFallbackPhrases: document.getElementById("set-ai-fallbacks").value.split("\\n").map((s) => s.trim()).filter(Boolean),
+    aiFallbackPhrases: document.getElementById("set-ai-fallbacks").value.split("\n").map((s) => s.trim()).filter(Boolean),
     groupReplyCooldownMs: intVal("set-group-cooldown", 12000),
     returningContactDays: intVal("set-returning-days", 7),
   };
