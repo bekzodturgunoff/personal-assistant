@@ -1,4 +1,5 @@
 import type {Bot} from "grammy/web";
+import {config} from "../../config/env.js";
 import {classifyIntent, type IntentSignals} from "../../lib/intent-classifier.js";
 import {getConversationsKv, getUserMeta, updateUserMeta, getWeeklyAccumulator, saveWeeklyAccumulator} from "../../memory/index.js";
 import {addMessage} from "../../conversation-memory.js";
@@ -56,6 +57,10 @@ function getSkipReason(info: MessageInfo): string | null {
   if (info.isBot) {
     console.log(`[Business] Skipping message from bot (${info.senderId})`);
     return "bot";
+  }
+  if (info.senderId && info.senderId === config.ownerUserId) {
+    console.log(`[Business] Skipping message from owner (${info.senderId})`);
+    return "owner";
   }
   const ocId = getOwnerChatId();
   if (info.senderId && info.senderId === ocId) {
