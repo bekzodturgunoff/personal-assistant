@@ -8,6 +8,17 @@ let commandsRegistered = false;
 export function createBot() {
   const bot = new Bot(config.telegramBotToken);
 
+  if (config.debugEnabled) {
+    bot.use((ctx, next) => {
+      const update = ctx.update as unknown as Record<string, unknown>;
+      const keys = Object.keys(update || {});
+      const updateId = typeof update.update_id === "number" ? update.update_id : "?";
+      const topKey = keys.find((k) => k !== "update_id") || "unknown";
+      console.log(`[Bot] update_id=${updateId} type=${topKey} chat=${ctx.chat?.id ?? "?"} chat_type=${ctx.chat?.type ?? "?"}`);
+      return next();
+    });
+  }
+
   setupTelegramHandlers(bot);
 
   bot.catch((err) => {
