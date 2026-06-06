@@ -937,12 +937,12 @@ function renderSettings(s) {
   document.getElementById("set-style").value = s.background?.style || "";
   document.getElementById("set-languages").value = (s.background?.languages || []).join(", ");
 
-  document.getElementById("set-absolute-rules").value = (s.absoluteRules || []).join("\n");
-  document.getElementById("set-never-say").value = (s.neverSay || []).join("\n");
-  document.getElementById("set-behavior-rules").value = (s.behaviorRules || []).join("\n");
-  document.getElementById("set-fallback-rules").value = (s.fallbackRules || []).join("\n");
+  document.getElementById("set-absolute-rules").value = (s.absoluteRules || []).join("\\n");
+  document.getElementById("set-never-say").value = (s.neverSay || []).join("\\n");
+  document.getElementById("set-behavior-rules").value = (s.behaviorRules || []).join("\\n");
+  document.getElementById("set-fallback-rules").value = (s.fallbackRules || []).join("\\n");
 
-  document.getElementById("set-contact").value = (s.businessMode?.contact || []).join("\n");
+  document.getElementById("set-contact").value = (s.businessMode?.contact || []).join("\\n");
   document.getElementById("set-business-tone").value = s.businessMode?.tone || "";
 
   // Reply Timing
@@ -958,7 +958,7 @@ function renderSettings(s) {
   const conf = s.confidence || {};
   document.getElementById("set-conf-enabled").value = conf.enabled !== false ? "true" : "false";
   document.getElementById("set-conf-threshold").value = conf.fallbackThreshold ?? 0.65;
-  document.getElementById("set-conf-phrases").value = (conf.fallbackPhrases || []).join("\n");
+  document.getElementById("set-conf-phrases").value = (conf.fallbackPhrases || []).join("\\n");
 
   // Low conf alert
   document.getElementById("set-lowconf-threshold").value = s.lowConfAlertThreshold ?? 3;
@@ -976,7 +976,7 @@ function renderSettings(s) {
   document.getElementById("set-brain-interval").value = s.brainAnalysisInterval ?? 4;
 
   // AI fallbacks
-  document.getElementById("set-ai-fallbacks").value = (s.aiFallbackPhrases || []).join("\n");
+  document.getElementById("set-ai-fallbacks").value = (s.aiFallbackPhrases || []).join("\\n");
 
   // Other
   document.getElementById("set-group-cooldown").value = s.groupReplyCooldownMs ?? 12000;
@@ -1003,12 +1003,12 @@ function collectSettings() {
       style: document.getElementById("set-style").value.trim(),
       languages: document.getElementById("set-languages").value.split(",").map((s) => s.trim()).filter(Boolean),
     },
-    absoluteRules: document.getElementById("set-absolute-rules").value.split("\n").map((s) => s.trim()).filter(Boolean),
-    neverSay: document.getElementById("set-never-say").value.split("\n").map((s) => s.trim()).filter(Boolean),
-    behaviorRules: document.getElementById("set-behavior-rules").value.split("\n").map((s) => s.trim()).filter(Boolean),
-    fallbackRules: document.getElementById("set-fallback-rules").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    absoluteRules: document.getElementById("set-absolute-rules").value.split("\\n").map((s) => s.trim()).filter(Boolean),
+    neverSay: document.getElementById("set-never-say").value.split("\\n").map((s) => s.trim()).filter(Boolean),
+    behaviorRules: document.getElementById("set-behavior-rules").value.split("\\n").map((s) => s.trim()).filter(Boolean),
+    fallbackRules: document.getElementById("set-fallback-rules").value.split("\\n").map((s) => s.trim()).filter(Boolean),
     businessMode: {
-      contact: document.getElementById("set-contact").value.split("\n").map((s) => s.trim()).filter(Boolean),
+      contact: document.getElementById("set-contact").value.split("\\n").map((s) => s.trim()).filter(Boolean),
       tone: document.getElementById("set-business-tone").value.trim(),
     },
     replyTiming: {
@@ -1022,7 +1022,7 @@ function collectSettings() {
     confidence: {
       enabled: document.getElementById("set-conf-enabled").value === "true",
       fallbackThreshold: floatVal("set-conf-threshold", 0.65),
-      fallbackPhrases: document.getElementById("set-conf-phrases").value.split("\n").map((s) => s.trim()).filter(Boolean),
+      fallbackPhrases: document.getElementById("set-conf-phrases").value.split("\\n").map((s) => s.trim()).filter(Boolean),
       clarifiers: state.settings?.confidence?.clarifiers || {},
     },
     lowConfAlertThreshold: intVal("set-lowconf-threshold", 3),
@@ -1032,7 +1032,7 @@ function collectSettings() {
     maxResponseSentences: intVal("set-max-sentences", 3),
     brainAnalysisEnabled: document.getElementById("set-brain-enabled").value === "true",
     brainAnalysisInterval: intVal("set-brain-interval", 4),
-    aiFallbackPhrases: document.getElementById("set-ai-fallbacks").value.split("\n").map((s) => s.trim()).filter(Boolean),
+    aiFallbackPhrases: document.getElementById("set-ai-fallbacks").value.split("\\n").map((s) => s.trim()).filter(Boolean),
     groupReplyCooldownMs: intVal("set-group-cooldown", 12000),
     returningContactDays: intVal("set-returning-days", 7),
   };
