@@ -47,6 +47,20 @@ export const HTML_HEAD = `<!doctype html>
   .tab:hover:not(.active) { background: #334155; }
   .tab-content { display: none; }
   .tab-content.active { display: block; }
+  .error-banner { background: #7f1d1d; border: 1px solid #991b1b; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: none; }
+  .error-banner.visible { display: flex; align-items: flex-start; gap: 10px; }
+  .error-banner-icon { color: #fca5a5; font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; }
+  .error-banner-content { flex: 1; }
+  .error-banner-title { color: #fca5a5; font-size: 0.85rem; font-weight: 600; }
+  .error-banner-msg { color: #fecaca; font-size: 0.8rem; margin-top: 2px; }
+  .error-banner-dismiss { color: #fca5a5; cursor: pointer; font-size: 1rem; flex-shrink: 0; background: none; border: none; padding: 2px; }
+  .card-error { background: #1e293b; border: 1px solid #7f1d1d; border-radius: 12px; padding: 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+  .card-error-icon { color: #f87171; font-size: 1.5rem; }
+  .card-error-text { color: #fca5a5; font-size: 0.85rem; }
+  .loading-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #334155; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .load-more { display: block; width: 100%; padding: 10px; background: #1e293b; border: 1px dashed #334155; border-radius: 0 0 12px 12px; color: #94a3b8; cursor: pointer; font-size: 0.85rem; text-align: center; }
+  .load-more:hover { background: #334155; color: #e2e8f0; }
   .login-screen { display: flex; min-height: 80vh; align-items: center; justify-content: center; }
   .login-box { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 32px; width: 100%; max-width: 360px; }
   .login-box h2 { margin-bottom: 16px; }
@@ -93,10 +107,13 @@ export const HTML_HEAD = `<!doctype html>
   <div class="card-header">
     <h1>Bot Dashboard</h1>
     <div style="display:flex;align-items:center;gap:12px;">
+      <span id="loading-indicator" style="display:none;align-items:center;gap:6px;color:#64748b;font-size:0.8rem;"><span class="loading-spinner"></span> Loading...</span>
       <span id="month-display" style="color:#64748b;font-size:0.875rem;"></span>
       <button class="btn sm" onclick="sessionStorage.removeItem('dash_token');location.reload()" title="Lock">&#x1f512;</button>
     </div>
   </div>
+
+  <div id="dashboard-error-banner" class="error-banner"></div>
 
   <div class="tab-bar" id="tab-bar">
     <button class="tab active" data-tab="overview">Overview</button>

@@ -50,24 +50,79 @@ async function authFetch(url, opts = {}) {
   return res;
 }
 
+let dashboardErrors = [];
+
+function showLoading(show) {
+  const el = document.getElementById("loading-indicator");
+  if (el) el.style.display = show ? "flex" : "none";
+}
+
+function addDashboardError(title, msg) {
+  dashboardErrors.push({title, msg, time: Date.now()});
+  renderDashboardErrors();
+}
+
+function clearDashboardErrors() {
+  dashboardErrors = [];
+  renderDashboardErrors();
+}
+
+function renderDashboardErrors() {
+  const banner = document.getElementById("dashboard-error-banner");
+  if (!banner) return;
+  if (dashboardErrors.length === 0) {
+    banner.classList.remove("visible");
+    banner.innerHTML = "";
+    return;
+  }
+  banner.classList.add("visible");
+  banner.innerHTML = dashboardErrors.map((e, i) =>
+    '<div class="error-banner-content" style="' + (i > 0 ? 'margin-top:8px;padding-top:8px;border-top:1px solid #991b1b;' : '') + '">' +
+      '<div class="error-banner-title">' + esc(e.title) + '</div>' +
+      '<div class="error-banner-msg">' + esc(e.msg) + '</div>' +
+    '</div>'
+  ).join("") +
+  '<button class="error-banner-dismiss" onclick="clearDashboardErrors()">✕</button>';
+}
+
 async function fetchData() {
+  showLoading(true);
+  clearDashboardErrors();
   try {
     const [dataRes, settingsRes] = await Promise.all([
       authFetch("/api/dashboard/data"),
       authFetch("/api/dashboard/settings"),
     ]);
-    if (!dataRes.ok) return false;
+    if (!dataRes.ok) {
+      const errText = await dataRes.text().catch(() => "unknown error");
+      addDashboardError("Dashboard Data Failed", "Could not load dashboard data: " + errText.slice(0, 100));
+      showLoading(false);
+      return false;
+    }
     state = await dataRes.json();
+    if (!state || typeof state !== "object") {
+      addDashboardError("Invalid Data", "Dashboard returned malformed data");
+      showLoading(false);
+      return false;
+    }
     if (settingsRes.ok) {
       state.settings = await settingsRes.json();
+    } else {
+      addDashboardError("Settings Not Loaded", "Could not fetch bot settings. Some features may be unavailable.");
     }
     document.getElementById("login-screen").style.display = "none";
     document.getElementById("dashboard").style.display = "block";
     document.getElementById("login-error").style.display = "none";
     render();
-    loadConversations();
+    const convLoaded = await loadConversations();
+    if (!convLoaded) {
+      addDashboardError("Conversations Not Loaded", "Could not fetch conversation list. Overview may be incomplete.");
+    }
+    showLoading(false);
     return true;
-  } catch {
+  } catch (e) {
+    showLoading(false);
+    addDashboardError("Unexpected Error", "Failed to load dashboard: " + String(e).slice(0, 150));
     return false;
   }
 }
@@ -111,13 +166,25 @@ function renderBotStatus() {
     if (!r.ok) return null;
     return r.json();
   }).then(data => {
-    if (!data) return;
+    if (!data) {
+      label.textContent = "Unknown";
+      label.style.color = "#64748b";
+      slider.style.background = "#475569";
+      toggle.disabled = true;
+      return;
+    }
     toggle.checked = !data.muted;
     label.textContent = data.muted ? "Paused" : "Active";
     label.style.color = data.muted ? "#f87171" : "#4ade80";
     if (slider) slider.style.background = data.muted ? "#475569" : "#3b82f6";
     if (ts) ts.textContent = data.muted ? "Paused" : "Active";
-  }).catch(() => {});
+    toggle.disabled = false;
+  }).catch(() => {
+    label.textContent = "Error";
+    label.style.color = "#f87171";
+    slider.style.background = "#475569";
+    toggle.disabled = true;
+  });
 }
 
 async function toggleBotStatus() {
@@ -135,12 +202,23 @@ async function toggleBotStatus() {
   toast("Bot " + (muted ? "paused" : "activated"));
 }
 
+let conversationsOffset = 0;
+const CONVERSATIONS_PAGE_SIZE = 25;
+
 async function loadConversations() {
   const res = await authFetch("/api/conversations");
-  if (!res.ok) return;
+  if (!res.ok) return false;
   state.conversations = await res.json();
+  conversationsOffset = CONVERSATIONS_PAGE_SIZE;
   renderConversations();
   renderFlaggedContacts();
+  return true;
+}
+
+function loadMoreConversations() {
+  if (!state.conversations) return;
+  conversationsOffset += CONVERSATIONS_PAGE_SIZE;
+  renderConversations();
 }
 
 function renderConversations() {
@@ -159,7 +237,9 @@ function renderConversations() {
     el.innerHTML = '<p style="color:#64748b;text-align:center;padding:20px;">No conversations found</p>';
     return;
   }
-  el.innerHTML = filtered.map(c => {
+  const page = filtered.slice(0, conversationsOffset);
+  const hasMore = filtered.length > conversationsOffset;
+  let html = page.map(c => {
     const stage = c.relationshipStage || "stranger";
     const stageColor = stage === "regular" ? "#4ade80" : stage === "warm_lead" ? "#facc15" : stage === "acquaintance" ? "#60a5fa" : "#64748b";
     return '<div class="conv-row" onclick="selectConversation(' + "'" + esc(c.chatId) + "'" + ')" style="padding:10px;border-bottom:1px solid #1e293b;cursor:pointer;' + (c.muted ? 'opacity:0.5;' : '') + '">' +
@@ -175,6 +255,11 @@ function renderConversations() {
       '<div style="font-size:0.7rem;color:#64748b;margin-top:2px;">' + relativeTime(c.lastMessageAt) + '</div>' +
     '</div>';
   }).join("");
+  if (hasMore) {
+    const remaining = filtered.length - conversationsOffset;
+    html += '<div class="load-more" onclick="loadMoreConversations()">Load ' + Math.min(remaining, CONVERSATIONS_PAGE_SIZE) + ' more (' + remaining + ' remaining)</div>';
+  }
+  el.innerHTML = html;
 }
 
 function relativeTime(ts) {
@@ -194,10 +279,18 @@ let selectedChatId = null;
 
 async function selectConversation(chatId) {
   selectedChatId = chatId;
-  const res = await authFetch("/api/conversations/" + chatId);
-  if (!res.ok) return;
-  const data = await res.json();
   const el = document.getElementById("conv-detail");
+  el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px;"><span class="loading-spinner"></span><span style="color:#64748b;">Loading...</span></div>';
+  const res = await authFetch("/api/conversations/" + chatId);
+  if (!res.ok) {
+    el.innerHTML = '<div class="card-error" style="margin:20px;"><span class="card-error-icon">⚠</span><span class="card-error-text">Failed to load conversation — chat may not exist or KV is unavailable</span></div>';
+    return;
+  }
+  const data = await res.json();
+  if (!data || !data.entries) {
+    el.innerHTML = '<div class="card-error" style="margin:20px;"><span class="card-error-icon">⚠</span><span class="card-error-text">Conversation data is empty or malformed</span></div>';
+    return;
+  }
   const brain = data.brainOutput || {};
   const meta = data.meta || {};
   const intentOptions = ["price_inquiry", "complaint", "greeting", "request", "follow_up", "other"];
@@ -214,6 +307,7 @@ async function selectConversation(chatId) {
       '<button class="btn sm" onclick="cancelPending(' + "'" + esc(chatId) + "'" + ')">Cancel pending</button>' +
       '<button class="btn sm" onclick="runBrainNow(' + "'" + esc(chatId) + "'" + ')">Run brain</button>' +
       '<button class="btn sm danger" onclick="resetBrain(' + "'" + esc(chatId) + "'" + ')">Reset brain</button>' +
+      '<button class="btn sm danger" onclick="forgetConversation(' + "'" + esc(chatId) + "'" + ')" style="background:#7c3aed;color:white;">Forget</button>' +
     '</div>' +
     '<div class="card" style="padding:12px;margin-bottom:12px;">' +
       '<h3 style="font-size:0.9rem;color:#94a3b8;margin-bottom:8px;">Brain Analysis</h3>' +
@@ -316,6 +410,24 @@ async function resetBrain(chatId) {
   }
 }
 
+async function forgetConversation(chatId) {
+  if (!confirm("PERMANENTLY wipe ALL data for this contact? This cannot be undone!")) return;
+  if (!confirm("Really? All memory, brain data, meta, persona — everything?")) return;
+  const res = await authFetch("/api/dashboard/conversations/" + chatId + "/action", {
+    method: "POST",
+    body: JSON.stringify({action: "forget_confirm"}),
+  });
+  if (res.ok) {
+    toast("All data wiped for #" + chatId);
+    selectedChatId = null;
+    document.getElementById("conv-detail").innerHTML = '<p style="color:#64748b;text-align:center;margin-top:40px;">Select a contact to view details</p>';
+    loadConversations();
+  } else {
+    const err = await res.text().catch(() => "unknown error");
+    toast("Failed to forget: " + err.slice(0, 100), true);
+  }
+}
+
 async function patchBrainMeta(chatId, field, value) {
   const res = await authFetch("/api/conversations/" + chatId + "/meta", {
     method: "PATCH",
@@ -325,11 +437,11 @@ async function patchBrainMeta(chatId, field, value) {
 }
 
 async function patchBrainField(chatId, field, value) {
-  const res = await authFetch("/api/brain/" + chatId + "/meta", {
+  const res = await authFetch("/api/brain/" + chatId, {
     method: "PATCH",
     body: JSON.stringify({[field]: value}),
   });
-  if (!res.ok) toast("Failed to update", true);
+  if (!res.ok) toast("Failed to update brain field: " + (await res.text().catch(() => "unknown error")).slice(0, 100), true);
 }
 
 function renderFlaggedContacts() {
@@ -373,9 +485,15 @@ function switchTab(name) {
 
 async function loadBrainTab() {
   const res = await authFetch("/api/brain/overview");
-  if (!res.ok) return;
+  if (!res.ok) {
+    document.getElementById("brain-stats").innerHTML = '<div class="card-error"><span class="card-error-icon">⚠</span><span class="card-error-text">Brain overview unavailable — ' + res.status + ' error</span></div>';
+    return;
+  }
   const data = await res.json();
-  if (!data || typeof data !== "object") return;
+  if (!data || typeof data !== "object") {
+    document.getElementById("brain-stats").innerHTML = '<div class="card-error"><span class="card-error-icon">⚠</span><span class="card-error-text">Brain data is malformed or empty</span></div>';
+    return;
+  }
   renderBrainStats(data);
   renderBrainBreakdown(data.intentBreakdown || {}, "brain-intent-breakdown", ["#60a5fa","#facc15","#f87171","#4ade80","#a78bfa","#64748b"]);
   renderBrainBreakdown(data.sentimentBreakdown || {}, "brain-sentiment-breakdown", ["#4ade80","#94a3b8","#f87171"]);
@@ -388,6 +506,8 @@ async function loadBrainTab() {
     tbody.innerHTML = lc.map(c =>
       '<tr><td><code style="color:#93c5fd;">#' + esc(c.chatId) + '</code></td><td style="color:#f87171;">' + (c.lastConfidence || 0).toFixed(2) + '</td><td style="color:#94a3b8;font-size:0.8rem;">' + esc((c.personaNotes || "").slice(0, 40)) + '</td><td><button class="btn sm" onclick="runBrainNow(' + "'" + esc(c.chatId) + "'" + ')">Run brain</button></td></tr>'
     ).join("");
+  } else {
+    document.getElementById("brain-lowconf-table").innerHTML = '<tr><td colspan="4" style="color:#f87171;text-align:center;">Failed to load low-confidence data</td></tr>';
   }
 }
 
@@ -421,11 +541,15 @@ function renderBrainBreakdown(data, elementId, colors) {
 async function loadBrainEditor() {
   const chatId = document.getElementById("brain-editor-chatid").value.trim();
   if (!chatId) return toast("Enter a chat ID", true);
+  const el = document.getElementById("brain-editor-fields");
+  el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:20px;"><span class="loading-spinner"></span><span style="color:#64748b;">Loading brain data...</span></div>';
   const res = await authFetch("/api/brain/" + chatId);
-  if (!res.ok) return toast("Contact not found", true);
+  if (!res.ok) {
+    el.innerHTML = '<div class="card-error"><span class="card-error-icon">⚠</span><span class="card-error-text">Contact not found or brain data unavailable for chat #' + esc(chatId) + '</span></div>';
+    return;
+  }
   const data = await res.json();
   const output = data.output || {};
-  const el = document.getElementById("brain-editor-fields");
   const intentOptions = ["price_inquiry", "complaint", "greeting", "request", "follow_up", "other"];
   const sentimentOptions = ["positive", "neutral", "negative"];
   const urgencyOptions = ["low", "medium", "high"];
@@ -484,7 +608,10 @@ let editingCommandId = null;
 
 async function loadCommands() {
   const res = await authFetch("/api/commands");
-  if (!res.ok) return;
+  if (!res.ok) {
+    document.getElementById("command-list").innerHTML = '<div class="card-error" style="margin:12px;"><span class="card-error-icon">⚠</span><span class="card-error-text">Failed to load commands — ' + res.status + ' error</span></div>';
+    return;
+  }
   commandList = await res.json();
   renderCommandList();
 }
@@ -624,7 +751,11 @@ async function registerCommand() {
 
 async function loadPersonaTab() {
   const settings = state.settings;
-  if (!settings) return;
+  if (!settings) {
+    document.getElementById("time-personality-editor").innerHTML = '<div class="card-error"><span class="card-error-icon">⚠</span><span class="card-error-text">Settings not loaded — persona editor unavailable</span></div>';
+    document.getElementById("relationship-stage-editor").innerHTML = '';
+    return;
+  }
   renderTimePersonality(settings);
   renderRelationshipStages(settings);
 }
@@ -715,7 +846,10 @@ async function testPersona() {
 
 async function loadPersonaHistory() {
   const res = await authFetch("/api/persona/history");
-  if (!res.ok) return;
+  if (!res.ok) {
+    document.getElementById("persona-history-list").innerHTML = '<div class="card-error" style="margin:8px 0;"><span class="card-error-icon">⚠</span><span class="card-error-text">Failed to load version history</span></div>';
+    return;
+  }
   const history = await res.json();
   const el = document.getElementById("persona-history-list");
   if (history.length === 0) { el.innerHTML = '<p style="color:#64748b;">No history yet</p>'; return; }
@@ -737,15 +871,14 @@ async function revertPersona(savedAt) {
 // ── Model cooldowns ──
 
 async function loadModelCooldowns() {
+  const el = document.getElementById("model-cooldowns");
+  if (!el) return;
   const res = await authFetch("/api/dashboard/models/cooldowns");
-  if (!res.ok) return;
-  const cooldowns = await res.json();
-  const el = document.getElementById("model-cooldowns") || document.createElement("div");
-  el.id = "model-cooldowns";
-  if (!document.getElementById("model-cooldowns")) {
-    const modelStatus = document.getElementById("model-status");
-    modelStatus.parentNode.insertBefore(el, modelStatus.nextSibling);
+  if (!res.ok) {
+    el.innerHTML = '<p style="color:#f87171;font-size:0.8rem;margin-top:8px;">Failed to load cooldowns</p>';
+    return;
   }
+  const cooldowns = await res.json();
   const active = cooldowns.filter(c => c.coolingDown);
   if (active.length === 0) { el.innerHTML = '<p style="color:#94a3b8;font-size:0.8rem;margin-top:8px;">No models in cooldown</p>'; return; }
   el.innerHTML = '<h3 style="font-size:0.85rem;color:#f87171;margin-top:12px;margin-bottom:8px;">Models in Cooldown</h3>' +
@@ -768,6 +901,10 @@ async function clearCooldown(model) {
 
 function renderWeeklyStats() {
   const w = state.weekly || {};
+  if (!state.weekly) {
+    document.getElementById("weekly-stats").innerHTML = '<div class="card-error"><span class="card-error-icon">⚠</span><span class="card-error-text">Weekly stats unavailable — no data recorded yet or KV not accessible</span></div>';
+    return;
+  }
   document.getElementById("weekly-stats").innerHTML =
     statCard("Messages", w.totalMessages || 0, "green") +
     statCard("Chats Seen", w.conversationsSeen || 0, "blue") +
@@ -780,6 +917,10 @@ function renderMonthlyUsage() {
   const u = state.usage || {};
   const g = u.gemini?.total || {};
   const r = u.groq?.total || {};
+  if (!state.usage) {
+    document.getElementById("monthly-usage").innerHTML = '<div class="card-error"><span class="card-error-icon">⚠</span><span class="card-error-text">Usage data unavailable — no usage recorded yet</span></div>';
+    return;
+  }
   document.getElementById("monthly-usage").innerHTML =
     statCard("Gemini Calls", g.calls || 0, "blue") +
     statCard("Gemini Tokens", (g.inputTokens + g.outputTokens || 0).toLocaleString(), "blue") +
@@ -793,13 +934,18 @@ function renderModelStatus() {
   const groq = m.groq || {};
   const groqChat = groq.chatModels || [];
   const groqJson = groq.jsonModels || [];
+  if (!state.models) {
+    document.getElementById("model-status").innerHTML = '<div class="card-error"><span class="card-error-icon">⚠</span><span class="card-error-text">Model status unavailable — config not loaded</span></div><div id="model-cooldowns"></div>';
+    loadModelCooldowns();
+    return;
+  }
   document.getElementById("model-status").innerHTML =
     '<div style="margin-bottom:8px;"><span style="color:#64748b;font-size:0.8rem;">Gemini:</span> ' +
-    geminiModels.map((m, i) => '<span class="model-tag' + (i===0?' primary':'') + '">' + esc(m) + '</span>').join("") +
+    (geminiModels.length ? geminiModels.map((m, i) => '<span class="model-tag' + (i===0?' primary':'') + '">' + esc(m) + '</span>').join("") : '<span style="color:#f87171;font-size:0.8rem;">No models configured</span>') +
     '</div><div><span style="color:#64748b;font-size:0.8rem;">Groq Chat:</span> ' +
-    groqChat.map((m) => '<span class="model-tag">' + esc(m) + '</span>').join("") +
+    (groqChat.length ? groqChat.map((m) => '<span class="model-tag">' + esc(m) + '</span>').join("") : '<span style="color:#f87171;font-size:0.8rem;">No models configured</span>') +
     '</div><div><span style="color:#64748b;font-size:0.8rem;">Groq JSON:</span> ' +
-    groqJson.map((m) => '<span class="model-tag">' + esc(m) + '</span>').join("") + '</div>' +
+    (groqJson.length ? groqJson.map((m) => '<span class="model-tag">' + esc(m) + '</span>').join("") : '<span style="color:#f87171;font-size:0.8rem;">No models configured</span>') + '</div>' +
     '<div id="model-cooldowns"></div>';
   loadModelCooldowns();
 }
@@ -807,6 +953,10 @@ function renderModelStatus() {
 function renderGeminiUsage() {
   const models = state.usage?.gemini?.models || {};
   const tbody = document.querySelector("#gemini-usage-table tbody");
+  if (!state.usage) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#f87171;text-align:center;">Usage data unavailable</td></tr>';
+    return;
+  }
   const entries = Object.entries(models);
   if (entries.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="color:#64748b;text-align:center;">No usage yet</td></tr>'; return; }
   tbody.innerHTML = entries.map(([model, data]) =>
@@ -817,6 +967,10 @@ function renderGeminiUsage() {
 function renderGroqUsage() {
   const models = state.usage?.groq?.models || {};
   const tbody = document.querySelector("#groq-usage-table tbody");
+  if (!state.usage) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#f87171;text-align:center;">Usage data unavailable</td></tr>';
+    return;
+  }
   const entries = Object.entries(models);
   if (entries.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="color:#64748b;text-align:center;">No usage yet</td></tr>'; return; }
   tbody.innerHTML = entries.map(([model, data]) =>
@@ -923,8 +1077,15 @@ async function resetUsage() {
 // ── Settings tab ──
 async function loadSettings() {
   const res = await authFetch("/api/dashboard/settings");
-  if (!res.ok) return;
+  if (!res.ok) {
+    toast("Failed to load settings — " + res.status, true);
+    return;
+  }
   const s = await res.json();
+  if (!s || typeof s !== "object") {
+    toast("Settings data is malformed", true);
+    return;
+  }
   state.settings = s;
   renderSettings(s);
 }
